@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo, useState } from 'react';
 import { analyzeLedger, type LedgerAnalysis } from '../../src/lib/analyzeLedger';
+import { generatePL, type ProfitAndLoss } from '../../src/lib/generatePL';
 import { FileDropzone } from './components/FileDropzone';
 import { PreviewTable } from './components/PreviewTable';
 import { ValidationPanel } from './components/ValidationPanel';
@@ -18,6 +19,7 @@ import {
 export default function UploadPage() {
   const [previewRows, setPreviewRows] = useState<LedgerRow[]>([]);
   const [analysis, setAnalysis] = useState<LedgerAnalysis | null>(null);
+  const [profitAndLoss, setProfitAndLoss] = useState<ProfitAndLoss | null>(null);
   const [headerErrors, setHeaderErrors] = useState<string[]>([]);
   const [rowIssues, setRowIssues] = useState<RowIssue[]>([]);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -30,6 +32,7 @@ export default function UploadPage() {
     setRowIssues([]);
     setPreviewRows([]);
     setAnalysis(null);
+    setProfitAndLoss(null);
   };
 
   const handleParse = useCallback(async (file: File) => {
@@ -52,6 +55,7 @@ export default function UploadPage() {
       }
 
       setAnalysis(analyzeLedger(result.rows));
+      setProfitAndLoss(generatePL(result.rows));
       setPreviewRows(result.rows.slice(0, 50));
     } catch {
       setUploadError('Unable to parse file. Please verify the file format.');
@@ -90,6 +94,14 @@ export default function UploadPage() {
   }, []);
 
   const previewColumns = useMemo(() => requiredHeaders, []);
+  const currencyFormatter = useMemo(
+    () =>
+      new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD',
+      }),
+    [],
+  );
 
   return (
     <div className="min-h-screen bg-slate-50 py-10 px-4 text-slate-900">
@@ -160,6 +172,60 @@ export default function UploadPage() {
                   </div>
                 ) : (
                   <p className="mt-3 text-sm text-slate-600">No vendors were found with multiple distribution accounts.</p>
+                )}
+              </div>
+            </div>
+          ) : null}
+
+          {profitAndLoss ? (
+            <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <h2 className="text-lg font-semibold text-slate-900">Profit &amp; Loss</h2>
+                  <p className="mt-1 text-sm text-slate-600">Revenue and expense totals generated from ledger account types.</p>
+                </div>
+                <div className="rounded-full bg-emerald-100 px-4 py-2 text-sm font-semibold text-emerald-800">
+                  Net Profit: {currencyFormatter.format(profitAndLoss.netProfit)}
+                </div>
+              </div>
+
+              <div className="mt-4 grid gap-4 sm:grid-cols-3">
+                <div className="rounded-2xl bg-white p-4 shadow-sm">
+                  <p className="text-sm text-slate-500">Total Revenue</p>
+                  <p className="mt-2 text-2xl font-semibold text-slate-900">
+                    {currencyFormatter.format(profitAndLoss.totalRevenue)}
+                  </p>
+                </div>
+                <div className="rounded-2xl bg-white p-4 shadow-sm">
+                  <p className="text-sm text-slate-500">Total Expenses</p>
+                  <p className="mt-2 text-2xl font-semibold text-slate-900">
+                    {currencyFormatter.format(profitAndLoss.totalExpenses)}
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 shadow-sm">
+                  <p className="text-sm text-emerald-700">Net Profit</p>
+                  <p className="mt-2 text-2xl font-semibold text-emerald-900">
+                    {currencyFormatter.format(profitAndLoss.netProfit)}
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-4 rounded-2xl bg-white p-4 shadow-sm">
+                <h3 className="text-sm font-semibold uppercase tracking-[0.16em] text-slate-500">Monthly Breakdown</h3>
+                {Object.keys(profitAndLoss.monthlyBreakdown).length > 0 ? (
+                  <div className="mt-3 space-y-2">
+                    {Object.entries(profitAndLoss.monthlyBreakdown).map(([month, summary]) => (
+                      <div key={month} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                        <span className="font-semibold text-slate-900">{month}</span>
+                        <span>
+                          Revenue: {currencyFormatter.format(summary.revenue)} | Expenses:{' '}
+                          {currencyFormatter.format(summary.expenses)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-3 text-sm text-slate-600">No income or expense transactions with valid dates were available for monthly summaries.</p>
                 )}
               </div>
             </div>
