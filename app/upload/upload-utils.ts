@@ -39,7 +39,21 @@ export const requiredHeaders: HeaderKey[] = [
   'Balance',
 ];
 
+const requiredRowFields: HeaderKey[] = [
+  'Distribution account',
+  'Distribution account type',
+  'Transaction date',
+  'Transaction type',
+];
+
 const normalizeHeader = (value: string) => value.trim();
+
+const hasAnyValue = (row: Partial<Record<HeaderKey, string>>) =>
+  requiredHeaders.some((header) => Boolean(row[header]?.trim()));
+
+const isNonTransactionRow = (row: Partial<Record<HeaderKey, string>>) =>
+  (!row['Transaction date']?.trim() && !row['Transaction type']?.trim()) ||
+  (!row.Amount?.trim() && !row.Balance?.trim());
 
 export const validateHeaders = (headers: string[]) => {
   const trimmed = headers.map(normalizeHeader);
@@ -60,7 +74,7 @@ export const validateHeaders = (headers: string[]) => {
 export const validateLedgerRow = (row: LedgerRow, rowIndex: number): RowIssue | null => {
   const issues: string[] = [];
 
-  requiredHeaders.forEach((header) => {
+  requiredRowFields.forEach((header) => {
     if (!row[header]?.trim()) {
       issues.push(`${header} is required.`);
     }
@@ -71,6 +85,10 @@ export const validateLedgerRow = (row: LedgerRow, rowIndex: number): RowIssue | 
     if (Number.isNaN(parsed)) {
       issues.push('Transaction date must be valid.');
     }
+  }
+
+  if (!row.Amount?.trim() && !row.Balance?.trim()) {
+    issues.push('Amount or Balance is required.');
   }
 
   const numericFields: Array<'Amount' | 'Balance'> = ['Amount', 'Balance'];
@@ -91,7 +109,7 @@ const buildLedgerRows = (rawRows: Array<Record<string, unknown>>) => {
       acc[header] = String(rawValue).trim();
       return acc;
     }, {} as LedgerRow);
-  });
+  }).filter((row) => hasAnyValue(row) && !isNonTransactionRow(row));
 };
 
 export const isCsvFile = (file: File) => file.type === 'text/csv' || file.name.toLowerCase().endsWith('.csv');
@@ -149,14 +167,17 @@ export const parseXlsxFile = async (file: File): Promise<ParseResult> => {
     return { rows: [], headerErrors, rowIssues: [] };
   }
 
-  const rows = rawRows.slice(1).map((rowArray) => {
-    return requiredHeaders.reduce((acc, header) => {
-      const index = normalizedHeaders.indexOf(header);
-      const rawValue = Array.isArray(rowArray) ? rowArray[index] ?? '' : '';
-      acc[header] = String(rawValue).trim();
-      return acc;
-    }, {} as LedgerRow);
-  });
+  const rows = rawRows
+    .slice(1)
+    .map((rowArray) => {
+      return requiredHeaders.reduce((acc, header) => {
+        const index = normalizedHeaders.indexOf(header);
+        const rawValue = Array.isArray(rowArray) ? rowArray[index] ?? '' : '';
+        acc[header] = String(rawValue).trim();
+        return acc;
+      }, {} as LedgerRow);
+    })
+    .filter((row) => hasAnyValue(row) && !isNonTransactionRow(row));
 
   const rowIssues = rows
     .map((row, index) => validateLedgerRow(row, index))
