@@ -6,9 +6,9 @@ type FileDropzoneProps = {
   fileName: string;
   isDragging: boolean;
   onFileChange: (event: ChangeEvent<HTMLInputElement>) => void;
-  onDragOver: (event: DragEvent<HTMLDivElement>) => void;
+  onDragOver: (event: DragEvent<HTMLLabelElement>) => void;
   onDragLeave: () => void;
-  onDrop: (event: DragEvent<HTMLDivElement>) => void;
+  onDrop: (event: DragEvent<HTMLLabelElement>) => void;
 };
 
 export function FileDropzone({
@@ -46,7 +46,9 @@ export function FileDropzone({
         />
         <div className="space-y-3">
           <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-slate-900 text-white">
-            <span className="text-2xl">⇪</span>
+            <span className="text-2xl" aria-hidden="true">
+              {'\u21EA'}
+            </span>
           </div>
           <div>
             <p className="text-lg font-semibold text-slate-950">Drop your file here</p>
