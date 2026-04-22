@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useMemo, useState } from 'react';
+import { analyzeLedger, type LedgerAnalysis } from '../../src/lib/analyzeLedger';
 import { FileDropzone } from './components/FileDropzone';
 import { PreviewTable } from './components/PreviewTable';
 import { ValidationPanel } from './components/ValidationPanel';
@@ -16,6 +17,7 @@ import {
 
 export default function UploadPage() {
   const [previewRows, setPreviewRows] = useState<LedgerRow[]>([]);
+  const [analysis, setAnalysis] = useState<LedgerAnalysis | null>(null);
   const [headerErrors, setHeaderErrors] = useState<string[]>([]);
   const [rowIssues, setRowIssues] = useState<RowIssue[]>([]);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -27,6 +29,7 @@ export default function UploadPage() {
     setHeaderErrors([]);
     setRowIssues([]);
     setPreviewRows([]);
+    setAnalysis(null);
   };
 
   const handleParse = useCallback(async (file: File) => {
@@ -48,8 +51,9 @@ export default function UploadPage() {
         return;
       }
 
+      setAnalysis(analyzeLedger(result.rows));
       setPreviewRows(result.rows.slice(0, 50));
-    } catch (error) {
+    } catch {
       setUploadError('Unable to parse file. Please verify the file format.');
     }
   }, []);
@@ -118,6 +122,48 @@ export default function UploadPage() {
           </div>
 
           <PreviewTable columns={previewColumns} rows={previewRows} rowIssues={rowIssues} />
+
+          {analysis ? (
+            <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <h2 className="text-lg font-semibold text-slate-900">Ledger Analysis</h2>
+                  <p className="mt-1 text-sm text-slate-600">Summary of the parsed transaction set.</p>
+                </div>
+                <div className="text-sm text-slate-500">Total transactions: {analysis.totalTransactions}</div>
+              </div>
+
+              <div className="mt-4 grid gap-4 sm:grid-cols-3">
+                <div className="rounded-2xl bg-white p-4 shadow-sm">
+                  <p className="text-sm text-slate-500">Total transactions</p>
+                  <p className="mt-2 text-2xl font-semibold text-slate-900">{analysis.totalTransactions}</p>
+                </div>
+                <div className="rounded-2xl bg-white p-4 shadow-sm">
+                  <p className="text-sm text-slate-500">Inconsistent vendors</p>
+                  <p className="mt-2 text-2xl font-semibold text-slate-900">{analysis.inconsistentVendors.length}</p>
+                </div>
+                <div className="rounded-2xl bg-white p-4 shadow-sm">
+                  <p className="text-sm text-slate-500">Duplicate count</p>
+                  <p className="mt-2 text-2xl font-semibold text-slate-900">{analysis.duplicates.length}</p>
+                </div>
+              </div>
+
+              <div className="mt-4 rounded-2xl bg-white p-4 shadow-sm">
+                <h3 className="text-sm font-semibold uppercase tracking-[0.16em] text-slate-500">Inconsistent Vendors</h3>
+                {analysis.inconsistentVendors.length > 0 ? (
+                  <div className="mt-3 space-y-2">
+                    {analysis.inconsistentVendors.map(({ vendor, accounts }) => (
+                      <div key={vendor} className="rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                        <span className="font-semibold">{vendor}</span>: {accounts.join(', ')}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-3 text-sm text-slate-600">No vendors were found with multiple distribution accounts.</p>
+                )}
+              </div>
+            </div>
+          ) : null}
         </div>
       </div>
     </div>
