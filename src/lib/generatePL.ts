@@ -1,4 +1,5 @@
 import type { LedgerRow } from '../../app/upload/upload-utils';
+import { isExpenseType, isRevenueType, parseCurrencyAmount, roundCurrency } from './accounting';
 
 export type MonthlyPLSummary = {
   revenue: number;
@@ -12,34 +13,14 @@ export type ProfitAndLoss = {
   monthlyBreakdown: Record<string, MonthlyPLSummary>;
 };
 
-const normalizeValue = (value: string) => value.trim();
-
-const isRevenueType = (accountType: string) => accountType.includes('income');
-
-const isExpenseType = (accountType: string) =>
-  accountType.includes('expense') || accountType === 'expenses' || accountType === 'cost of goods sold';
-
 const parseAmount = (value: string) => {
-  const normalized = normalizeValue(value);
-  if (!normalized) {
-    return 0;
-  }
-
-  const isNegative = normalized.startsWith('(') && normalized.endsWith(')');
-  const numericPortion = normalized.replace(/[,$()\s]/g, '');
-  const parsed = Number(numericPortion);
-
-  if (!Number.isFinite(parsed)) {
-    return 0;
-  }
-
-  return isNegative ? -parsed : parsed;
+  return parseCurrencyAmount(value) ?? 0;
 };
 
 const padMonth = (value: number) => String(value).padStart(2, '0');
 
 const extractMonthKey = (value: string) => {
-  const normalized = normalizeValue(value);
+  const normalized = value.trim();
   if (!normalized) {
     return null;
   }
@@ -81,7 +62,7 @@ const updateMonthlyBreakdown = (
   }
 
   const entry = monthlyBreakdown[monthKey] ?? { revenue: 0, expenses: 0 };
-  entry[category] += amount;
+  entry[category] = roundCurrency(entry[category] + amount);
   monthlyBreakdown[monthKey] = entry;
 };
 
@@ -91,17 +72,17 @@ export function generatePL(rows: LedgerRow[]): ProfitAndLoss {
   let totalExpenses = 0;
 
   rows.forEach((row) => {
-    const accountType = normalizeValue(row['Distribution account type']).toLowerCase();
+    const accountType = row['Distribution account type'];
     const amount = parseAmount(row.Amount);
     const monthKey = extractMonthKey(row['Transaction date']);
 
     if (isRevenueType(accountType)) {
-      totalRevenue += amount;
+      totalRevenue = roundCurrency(totalRevenue + amount);
       updateMonthlyBreakdown(monthlyBreakdown, monthKey, amount, 'revenue');
     }
 
     if (isExpenseType(accountType)) {
-      totalExpenses += amount;
+      totalExpenses = roundCurrency(totalExpenses + amount);
       updateMonthlyBreakdown(monthlyBreakdown, monthKey, amount, 'expenses');
     }
   });
@@ -113,7 +94,7 @@ export function generatePL(rows: LedgerRow[]): ProfitAndLoss {
   return {
     totalRevenue,
     totalExpenses,
-    netProfit: totalRevenue - totalExpenses,
+    netProfit: roundCurrency(totalRevenue - totalExpenses),
     monthlyBreakdown: sortedMonthlyBreakdown,
   };
 }

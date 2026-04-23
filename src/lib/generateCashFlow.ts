@@ -1,4 +1,5 @@
 import type { LedgerRow } from '../../app/upload/upload-utils';
+import { classifyBalanceSheetType, parseCurrencyAmount, roundCurrency } from './accounting';
 import type { ProfitAndLoss } from './generatePL';
 
 export type CashFlowAdjustment = {
@@ -21,23 +22,6 @@ type AccountSnapshot = {
 
 const normalizeValue = (value: string) => value.trim();
 
-const parseNumericValue = (value: string) => {
-  const normalized = normalizeValue(value);
-  if (!normalized) {
-    return null;
-  }
-
-  const isNegative = normalized.startsWith('(') && normalized.endsWith(')');
-  const numericPortion = normalized.replace(/[,$()\s]/g, '');
-  const parsed = Number(numericPortion);
-
-  if (!Number.isFinite(parsed)) {
-    return null;
-  }
-
-  return isNegative ? -parsed : parsed;
-};
-
 const calculateImpact = (type: AccountSnapshot['type'], change: number) => {
   if (type === 'asset') {
     return -change;
@@ -50,9 +34,9 @@ export function generateCashFlow(rows: LedgerRow[], profitAndLoss: ProfitAndLoss
   const accountSnapshots = new Map<string, AccountSnapshot>();
 
   rows.forEach((row) => {
-    const accountType = normalizeValue(row['Distribution account type']).toLowerCase();
+    const accountType = classifyBalanceSheetType(row['Distribution account type']);
     const account = normalizeValue(row['Distribution account']);
-    const balance = parseNumericValue(row.Balance);
+    const balance = parseCurrencyAmount(row.Balance);
 
     if (!account || balance === null) {
       return;
@@ -64,21 +48,21 @@ export function generateCashFlow(rows: LedgerRow[], profitAndLoss: ProfitAndLoss
 
     const existingSnapshot = accountSnapshots.get(account);
     if (existingSnapshot) {
-      existingSnapshot.lastBalance = balance;
+      existingSnapshot.lastBalance = roundCurrency(balance);
       return;
     }
 
     accountSnapshots.set(account, {
       type: accountType,
-      firstBalance: balance,
-      lastBalance: balance,
+      firstBalance: roundCurrency(balance),
+      lastBalance: roundCurrency(balance),
     });
   });
 
   const adjustments = Array.from(accountSnapshots.entries())
     .map(([account, snapshot]) => {
-      const change = snapshot.lastBalance - snapshot.firstBalance;
-      const impact = calculateImpact(snapshot.type, change);
+      const change = roundCurrency(snapshot.lastBalance - snapshot.firstBalance);
+      const impact = roundCurrency(calculateImpact(snapshot.type, change));
 
       return {
         account,
@@ -90,7 +74,7 @@ export function generateCashFlow(rows: LedgerRow[], profitAndLoss: ProfitAndLoss
     .sort((left, right) => left.account.localeCompare(right.account));
 
   const operatingCashFlow =
-    profitAndLoss.netProfit + adjustments.reduce((total, adjustment) => total + adjustment.impact, 0);
+    roundCurrency(profitAndLoss.netProfit + adjustments.reduce((total, adjustment) => total + adjustment.impact, 0));
 
   return {
     netProfit: profitAndLoss.netProfit,

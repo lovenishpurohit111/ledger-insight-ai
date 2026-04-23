@@ -1,5 +1,6 @@
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
+import { parseCurrencyAmount } from '../../src/lib/accounting';
 
 export type HeaderKey =
   | 'Distribution account'
@@ -94,7 +95,7 @@ export const validateLedgerRow = (row: LedgerRow, rowIndex: number): RowIssue | 
   const numericFields: Array<'Amount' | 'Balance'> = ['Amount', 'Balance'];
   numericFields.forEach((field) => {
     const value = row[field]?.trim();
-    if (value && !/^[-+]?\d{1,3}(?:,\d{3})*(?:\.\d+)?$/.test(value) && !/^[-+]?\d*(?:\.\d+)?$/.test(value)) {
+    if (value && parseCurrencyAmount(value) === null) {
       issues.push(`${field} must be numeric.`);
     }
   });

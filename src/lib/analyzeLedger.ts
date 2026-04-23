@@ -38,6 +38,10 @@ export function analyzeLedger(rows: LedgerRow[]): LedgerAnalysis {
       vendorAccounts.set(vendor, accounts);
     }
 
+    if (!vendor || !amount || !transactionDate) {
+      return;
+    }
+
     const duplicateKey = [vendor, amount, transactionDate].join('::');
     const existingDuplicate = duplicateCounts.get(duplicateKey);
 
