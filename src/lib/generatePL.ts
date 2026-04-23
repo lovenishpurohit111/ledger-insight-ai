@@ -14,6 +14,11 @@ export type ProfitAndLoss = {
 
 const normalizeValue = (value: string) => value.trim();
 
+const isRevenueType = (accountType: string) => accountType.includes('income');
+
+const isExpenseType = (accountType: string) =>
+  accountType.includes('expense') || accountType === 'expenses' || accountType === 'cost of goods sold';
+
 const parseAmount = (value: string) => {
   const normalized = normalizeValue(value);
   if (!normalized) {
@@ -90,12 +95,12 @@ export function generatePL(rows: LedgerRow[]): ProfitAndLoss {
     const amount = parseAmount(row.Amount);
     const monthKey = extractMonthKey(row['Transaction date']);
 
-    if (accountType === 'income') {
+    if (isRevenueType(accountType)) {
       totalRevenue += amount;
       updateMonthlyBreakdown(monthlyBreakdown, monthKey, amount, 'revenue');
     }
 
-    if (accountType === 'expense') {
+    if (isExpenseType(accountType)) {
       totalExpenses += amount;
       updateMonthlyBreakdown(monthlyBreakdown, monthKey, amount, 'expenses');
     }
