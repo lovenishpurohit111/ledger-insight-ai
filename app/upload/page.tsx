@@ -8,6 +8,7 @@ import { generatePL, type ProfitAndLoss } from '../../src/lib/generatePL';
 import { FileDropzone, type UploadTheme } from './components/FileDropzone';
 import { PreviewTable } from './components/PreviewTable';
 import { ValidationPanel } from './components/ValidationPanel';
+import { exportCsv, exportExcel, exportPdf } from '../../src/lib/exportUtils';
 import {
   isCsvFile,
   isExcelFile,
@@ -293,6 +294,40 @@ export default function UploadPage() {
           </div>
 
           <PreviewTable columns={previewColumns} rows={previewRows} rowIssues={rowIssues} theme={theme} />
+
+          {analysis && profitAndLoss && balanceSheet && cashFlow ? (
+            <div className={`rounded-3xl border p-5 ${ui.panel}`}>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className={`text-xs font-semibold uppercase tracking-widest ${ui.muted}`}>Export Results</p>
+                  <h2 className={`mt-0.5 text-base font-semibold ${ui.heading}`}>Download Analysis</h2>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => exportCsv(fileName, analysis, profitAndLoss, balanceSheet, cashFlow)}
+                    className="flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow transition-colors hover:bg-emerald-700"
+                  >
+                    ↓ CSV
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => exportExcel(fileName, analysis, profitAndLoss, balanceSheet, cashFlow)}
+                    className="flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow transition-colors hover:bg-blue-700"
+                  >
+                    ↓ Excel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => exportPdf(fileName, analysis, profitAndLoss, balanceSheet, cashFlow)}
+                    className="flex items-center gap-2 rounded-xl bg-rose-600 px-4 py-2 text-sm font-semibold text-white shadow transition-colors hover:bg-rose-700"
+                  >
+                    ↓ PDF
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : null}
 
           {analysis ? (
             <div className={`rounded-3xl border p-5 ${ui.panel}`}>
