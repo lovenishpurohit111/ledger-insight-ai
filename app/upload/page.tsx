@@ -217,6 +217,7 @@ export default function UploadPage() {
   );
 
   return (
+
     <div className={`min-h-screen px-4 py-10 ${ui.page}`}>
       <div className={`mx-auto w-full max-w-6xl rounded-3xl border p-8 ${ui.shell}`}>
         <div className="space-y-4">
@@ -239,6 +240,28 @@ export default function UploadPage() {
                   {themeOption}
                 </button>
               ))}
+            </div>
+          </div>
+
+          {/* Sample files download section */}
+          <div className={`rounded-3xl border p-5 ${ui.panel}`}>
+            <h2 className={`text-lg font-semibold ${ui.heading}`}>Sample Files</h2>
+            <p className={`mt-2 text-sm ${ui.body}`}>Download a sample ledger file to see the required format:</p>
+            <div className="mt-3 flex flex-wrap gap-4">
+              <a
+                href="/samples/sample-ledger.csv"
+                download
+                className="inline-block rounded-lg bg-cyan-600 px-4 py-2 text-white font-semibold shadow hover:bg-cyan-700 transition-colors"
+              >
+                Download CSV Sample
+              </a>
+              <a
+                href="/samples/sample-ledger.xlsx"
+                download
+                className="inline-block rounded-lg bg-cyan-600 px-4 py-2 text-white font-semibold shadow hover:bg-cyan-700 transition-colors"
+              >
+                Download XLSX Sample
+              </a>
             </div>
           </div>
 

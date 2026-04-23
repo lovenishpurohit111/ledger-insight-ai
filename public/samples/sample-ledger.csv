@@ -1,0 +1,4 @@
+Distribution account,Distribution account type,Transaction date,Transaction type,Num,Name,Description,Split,Amount,Balance
+1001,Asset,2024-01-01,Deposit,1,John Doe,Initial deposit,,1000,1000
+1001,Asset,2024-01-02,Withdrawal,2,John Doe,ATM withdrawal,,200,800
+2001,Liability,2024-01-03,Payment,3,Jane Smith,Loan payment,,500,300
