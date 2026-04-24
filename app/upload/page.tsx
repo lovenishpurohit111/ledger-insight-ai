@@ -326,9 +326,10 @@ export default function UploadPage() {
                 <div className={`rounded-3xl border p-6 ${ui.panel}`}>
                   <h3 className={`text-sm font-semibold uppercase tracking-widest ${ui.label}`}>Inconsistent Vendors</h3>
                   <div className="mt-3 space-y-2 max-h-48 overflow-y-auto">
-                    {analysis.inconsistentVendors.slice(0, 10).map(({ vendor, accounts }) => (
-                      <div key={vendor} className={`rounded-xl px-4 py-2.5 text-sm ${ui.warningRow}`}>
-                        <span className="font-semibold">{vendor}</span>: {accounts.join(', ')}
+                    {analysis.inconsistentVendors.slice(0, 10).map(({ vendor, accounts, reason }) => (
+                      <div key={`${vendor}-${reason}`} className={`rounded-xl px-4 py-2.5 text-sm ${ui.warningRow}`}>
+                        <div><span className="font-semibold">{vendor}</span> <span className="text-xs opacity-70">— {reason}</span></div>
+                        <div className="mt-0.5 text-xs opacity-80">{accounts.join(', ')}</div>
                       </div>
                     ))}
                   </div>
