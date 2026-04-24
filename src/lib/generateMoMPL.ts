@@ -66,13 +66,13 @@ export function generateMoMPL(rows: LedgerRow[]): MoMPL {
 
     if (isRevenueType(accountType)) {
       const cat = incomeCats.get(account) ?? new Map<string, number>();
-      cat.set(monthKey, roundCurrency((cat.get(monthKey) ?? 0) + Math.abs(amount)));
+      cat.set(monthKey, roundCurrency((cat.get(monthKey) ?? 0) + amount));
       incomeCats.set(account, cat);
     }
 
     if (isExpenseType(accountType)) {
       const cat = expenseCats.get(account) ?? new Map<string, number>();
-      cat.set(monthKey, roundCurrency((cat.get(monthKey) ?? 0) + Math.abs(amount)));
+      cat.set(monthKey, roundCurrency((cat.get(monthKey) ?? 0) + amount));
       expenseCats.set(account, cat);
     }
   });

@@ -24,24 +24,35 @@ export function generateBalanceSheet(rows: LedgerRow[]): BalanceSheet {
   const assetsMap  = new Map<string, number>();
   const liabMap    = new Map<string, number>();
   const equityMap  = new Map<string, number>();
+  // Track the last seen balance for each account (including $0 from empty)
+  const lastBalance = new Map<string, { value: number; bsType: BalanceSheetCategory }>();
   let cpe = 0;
 
   rows.forEach((row) => {
     const accountType = row['Distribution account type'].trim();
     const account     = row['Distribution account'].trim();
     const amount      = parseCurrencyAmount(row.Amount) ?? 0;
-    const balance     = parseCurrencyAmount(row.Balance);
     const bsType      = classifyBalanceSheetType(accountType);
 
-    // CPE: Revenue adds, Expenses subtract (always use abs to handle sign conventions)
-    if (isRevenueType(accountType)) cpe = roundCurrency(cpe + Math.abs(amount));
-    if (isExpenseType(accountType)) cpe = roundCurrency(cpe - Math.abs(amount));
+    // CPE: use signed amounts directly
+    if (isRevenueType(accountType)) cpe = roundCurrency(cpe + amount);
+    if (isExpenseType(accountType)) cpe = roundCurrency(cpe - amount);
 
-    if (!account || balance === null) return;
+    if (!account || !bsType) return;
 
-    if (bsType === 'asset')     assetsMap.set(account, roundCurrency(balance));
-    if (bsType === 'liability') liabMap.set(account, roundCurrency(balance));
-    if (bsType === 'equity')    equityMap.set(account, roundCurrency(balance));
+    // Use last balance per account — empty string means $0 (e.g. paid-off liability)
+    const balRaw = row.Balance.trim();
+    const bal = balRaw === '' ? 0 : parseCurrencyAmount(balRaw);
+    if (bal === null) return; // unparseable — skip
+
+    lastBalance.set(account, { value: roundCurrency(bal), bsType });
+  });
+
+  // Build BS maps from last-seen balance per account
+  lastBalance.forEach(({ value, bsType }, account) => {
+    if (bsType === 'asset')     assetsMap.set(account, value);
+    if (bsType === 'liability') liabMap.set(account, value);
+    if (bsType === 'equity')    equityMap.set(account, value);
   });
 
   if (cpe !== 0) equityMap.set('Current Period Earnings', cpe);
