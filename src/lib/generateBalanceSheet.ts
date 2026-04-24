@@ -1,5 +1,5 @@
 import type { LedgerRow } from '../../app/upload/upload-utils';
-import { BS_TOLERANCE, classifyBalanceSheetType, isExpenseType, isRevenueType, parseCurrencyAmount, roundCurrency } from './accounting';
+import { BS_TOLERANCE, classifyBalanceSheetType, isExpenseType, isRevenueType, parseCurrencyAmount, roundCurrency, type BalanceSheetCategory } from './accounting';
 
 export type BalanceSheetEntry = { account: string; value: number };
 
