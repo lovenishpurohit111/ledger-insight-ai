@@ -1,63 +1,38 @@
 export type BalanceSheetCategory = 'asset' | 'liability' | 'equity';
 
-const assetTypes = new Set([
-  'accounts receivable (a/r)',
-  'bank',
-  'fixed assets',
-  'other assets',
-  'other current assets',
-]);
-
-const liabilityTypes = new Set([
-  'accounts payable (a/p)',
-  'credit card',
-  'long term liabilities',
-  'other current liabilities',
-]);
-
 const normalizeValue = (value: string) => value.trim();
 
 export const parseCurrencyAmount = (value: string) => {
   const normalized = normalizeValue(value);
-  if (!normalized) {
-    return null;
-  }
-
-  const isNegative = normalized.startsWith('(') && normalized.endsWith(')');
-  const numericPortion = normalized.replace(/[,$()\s]/g, '');
+  if (!normalized) return null;
+  const isNegative = normalized.startsWith('(') && normalized.endsWith(')')
+    || normalized.startsWith('-');
+  const numericPortion = normalized.replace(/[,$()\\-\s]/g, '');
   const parsed = Number(numericPortion);
-
-  if (!Number.isFinite(parsed)) {
-    return null;
-  }
-
+  if (!Number.isFinite(parsed)) return null;
   return isNegative ? -parsed : parsed;
 };
 
-export const roundCurrency = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
+export const roundCurrency = (value: number) =>
+  Math.round((value + Number.EPSILON) * 100) / 100;
+
+// Tolerance for balance sheet check — real-world ledgers have $0–$5 rounding drift
+export const BS_TOLERANCE = 1.0;
 
 export const classifyBalanceSheetType = (value: string): BalanceSheetCategory | null => {
-  const accountType = normalizeValue(value).toLowerCase();
-
-  if (assetTypes.has(accountType) || accountType.includes('asset')) {
-    return 'asset';
-  }
-
-  if (liabilityTypes.has(accountType) || accountType.includes('liabilit')) {
-    return 'liability';
-  }
-
-  if (accountType === 'equity' || accountType.includes('equity')) {
-    return 'equity';
-  }
-
+  const t = normalizeValue(value).toLowerCase();
+  if (t.includes('asset') || t.includes('bank') || t.includes('receivable') || t.includes('prepaid') || t.includes('inventory')) return 'asset';
+  if (t.includes('liabilit') || t.includes('payable') || t.includes('loan') || t.includes('credit card') || t.includes('mortgage')) return 'liability';
+  if (t.includes('equity') || t.includes('capital') || t.includes('contribution') || t.includes('retained') || t.includes('partner')) return 'equity';
   return null;
 };
 
-export const isRevenueType = (value: string) => normalizeValue(value).toLowerCase().includes('income');
+export const isRevenueType = (value: string) => {
+  const t = normalizeValue(value).toLowerCase();
+  return t.includes('income') || t.includes('revenue') || t.includes('sales');
+};
 
 export const isExpenseType = (value: string) => {
-  const accountType = normalizeValue(value).toLowerCase();
-
-  return accountType.includes('expense') || accountType === 'expenses' || accountType === 'cost of goods sold';
+  const t = normalizeValue(value).toLowerCase();
+  return t.includes('expense') || t === 'expenses' || t.includes('cost of goods') || t.includes('cogs');
 };
