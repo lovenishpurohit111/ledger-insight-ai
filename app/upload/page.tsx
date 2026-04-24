@@ -492,11 +492,11 @@ export default function UploadPage() {
               </div>
             </div>
 
-            <div className="mt-6 overflow-x-auto">
+            <div className="mt-6 overflow-auto max-h-[70vh] rounded-2xl">
               <table className="w-full text-sm border-separate border-spacing-0">
-                <thead>
+                <thead className="sticky top-0 z-20">
                   <tr>
-                    <th className={`sticky left-0 z-10 rounded-tl-xl px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider ${ui.tableHead}`}>Account</th>
+                    <th className={`sticky left-0 z-30 rounded-tl-xl px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider ${ui.tableHead}`}>Account</th>
                     {momPL.months.map((m) => (
                       <th key={m} className={`px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider ${ui.tableHead}`}>{monthLabel(m)}</th>
                     ))}
