@@ -9,33 +9,31 @@ export type BalanceSheet = {
   equity: BalanceSheetEntry[];
   totals: { assetsTotal: number; liabilitiesTotal: number; equityTotal: number };
   isBalanced: boolean;
-  variance: number;        // Assets - (Liabilities + Equity)
+  variance: number;
   currentPeriodEarnings: number;
 };
 
 const buildEntries = (m: Map<string, number>) =>
-  Array.from(m.entries())
-    .map(([account, value]) => ({ account, value }))
+  Array.from(m.entries()).map(([account, value]) => ({ account, value }))
     .sort((a, b) => a.account.localeCompare(b.account));
 
 const sumEntries = (entries: BalanceSheetEntry[]) =>
   roundCurrency(entries.reduce((t, e) => t + e.value, 0));
 
 export function generateBalanceSheet(rows: LedgerRow[]): BalanceSheet {
-  const assetsMap     = new Map<string, number>();
-  const liabMap       = new Map<string, number>();
-  const equityMap     = new Map<string, number>();
+  const assetsMap  = new Map<string, number>();
+  const liabMap    = new Map<string, number>();
+  const equityMap  = new Map<string, number>();
   let cpe = 0;
 
   rows.forEach((row) => {
-    const accountType = row['Distribution account type'];
+    const accountType = row['Distribution account type'].trim();
     const account     = row['Distribution account'].trim();
     const amount      = parseCurrencyAmount(row.Amount) ?? 0;
     const balance     = parseCurrencyAmount(row.Balance);
     const bsType      = classifyBalanceSheetType(accountType);
 
-    // Current Period Earnings: Revenue amounts add, Expense amounts subtract
-    // QBO amounts are positive for both income and expense entries (debit-normal convention)
+    // CPE: Revenue adds, Expenses subtract (always use abs to handle sign conventions)
     if (isRevenueType(accountType)) cpe = roundCurrency(cpe + Math.abs(amount));
     if (isExpenseType(accountType)) cpe = roundCurrency(cpe - Math.abs(amount));
 
@@ -46,7 +44,6 @@ export function generateBalanceSheet(rows: LedgerRow[]): BalanceSheet {
     if (bsType === 'equity')    equityMap.set(account, roundCurrency(balance));
   });
 
-  // Only inject CPE if it's not already captured in equity account balances
   if (cpe !== 0) equityMap.set('Current Period Earnings', cpe);
 
   const assets      = buildEntries(assetsMap);

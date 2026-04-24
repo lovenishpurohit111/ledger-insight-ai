@@ -12,7 +12,7 @@ import { PreviewTable } from './components/PreviewTable';
 import { ValidationPanel } from './components/ValidationPanel';
 import {
   isCsvFile, isExcelFile, parseCsvFile, parseXlsxFile,
-  requiredHeaders, type LedgerRow, type RowIssue,
+  requiredHeaders, CORE_MANDATORY, type LedgerRow, type RowIssue,
 } from './upload-utils';
 
 type ThemeClasses = {
@@ -197,10 +197,17 @@ export default function UploadPage() {
             )}
             <div className={`rounded-2xl border p-5 ${ui.panel}`}>
               <h2 className={`text-sm font-semibold uppercase tracking-widest ${ui.label}`}>Required Headers</h2>
+              <p className={`mt-1 text-xs ${ui.muted}`}>Columns marked ✱ are strictly mandatory — the file will be rejected without them.</p>
               <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                {requiredHeaders.map((h) => (
-                  <div key={h} className={`rounded-xl px-4 py-2.5 text-sm ${ui.card} ${ui.body}`}>{h}</div>
-                ))}
+                {requiredHeaders.map((h) => {
+                  const mandatory = CORE_MANDATORY.includes(h as typeof CORE_MANDATORY[number]);
+                  return (
+                    <div key={h} className={`rounded-xl px-4 py-2.5 text-sm flex items-center justify-between ${mandatory ? (theme === 'dark' ? 'bg-cyan-950/60 text-cyan-200 border border-cyan-700' : 'bg-cyan-50 text-cyan-800 border border-cyan-200') : `${ui.card} ${ui.body}`}`}>
+                      <span>{h}</span>
+                      {mandatory && <span className="text-xs font-bold opacity-70">✱</span>}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </div>
