@@ -20,37 +20,40 @@ const DGRAY  = 'D9D9D9';
 const WHITE  = 'FFFFFF';
 const BLACK  = '000000';
 
-const hdr = (bgHex: string, fgHex = WHITE, bold = true, sz = 11): XLSX.CellStyle => ({
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type CS = any;
+
+const hdr = (bgHex: string, fgHex = WHITE, bold = true, sz = 11): CS => ({
   font: { bold, color: { rgb: fgHex }, sz, name: 'Calibri' },
   fill: { fgColor: { rgb: bgHex }, patternType: 'solid' },
   alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
   border: { bottom: { style: 'thin', color: { rgb: DGRAY } } },
 });
 
-const cell = (bold = false, color = BLACK, align: 'left'|'right'|'center' = 'left', bg?: string): XLSX.CellStyle => ({
+const cell = (bold = false, color = BLACK, align: 'left'|'right'|'center' = 'left', bg?: string): CS => ({
   font: { bold, color: { rgb: color }, sz: 10, name: 'Calibri' },
   fill: bg ? { fgColor: { rgb: bg }, patternType: 'solid' } : { patternType: 'none' },
   alignment: { horizontal: align, vertical: 'center' },
   border: { bottom: { style: 'hair', color: { rgb: DGRAY } } },
 });
 
-const money = (bold = false, color = BLACK, bg?: string): XLSX.CellStyle => ({
+const money = (bold = false, color = BLACK, bg?: string): CS => ({
   ...cell(bold, color, 'right', bg),
   numFmt: '"$"#,##0.00;[Red]"$"(#,##0.00)',
 });
 
-const pct: XLSX.CellStyle = {
+const pct: CS = {
   font: { sz: 10, name: 'Calibri' },
   alignment: { horizontal: 'right', vertical: 'center' },
   numFmt: '+0.0%;-0.0%;0.0%',
 };
 
-const setStyle = (ws: XLSX.WorkSheet, addr: string, style: XLSX.CellStyle) => {
+const setStyle = (ws: XLSX.WorkSheet, addr: string, style: CS) => {
   if (!ws[addr]) ws[addr] = { t: 'z', v: '' };
   ws[addr].s = style;
 };
 
-const applyRow = (ws: XLSX.WorkSheet, row: number, cols: string[], styles: XLSX.CellStyle[]) => {
+const applyRow = (ws: XLSX.WorkSheet, row: number, cols: string[], styles: CS[]) => {
   cols.forEach((c, i) => setStyle(ws, `${c}${row}`, styles[i] ?? styles[styles.length - 1]));
 };
 
@@ -93,7 +96,7 @@ export function exportExcel(fileName: string, analysis: LedgerAnalysis, pl: Prof
   {
     const ws: XLSX.WorkSheet = { '!ref': 'A1:C20' };
 
-    const writeCell = (addr: string, v: string | number, t: XLSX.ExcelDataType, s: XLSX.CellStyle) => { ws[addr] = { v, t, s }; };
+    const writeCell = (addr: string, v: string | number, t: string, s: CS) => { ws[addr] = { v, t, s }; };
 
     // Title
     ws['A1'] = { v: `Ledger Analysis — ${baseName(fileName)}`, t: 's', s: { font: { bold: true, sz: 16, color: { rgb: WHITE }, name: 'Calibri' }, fill: { fgColor: { rgb: BLUE }, patternType: 'solid' }, alignment: { horizontal: 'left', vertical: 'center' } } };
