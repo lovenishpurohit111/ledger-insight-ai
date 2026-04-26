@@ -116,7 +116,7 @@ export const isExcelFile = (f: File) =>
 
 // ─── CSV parser ──────────────────────────────────────────────────────────────
 
-export const parseCsvFile = async (file: File): Promise<ParseResult> => {
+export const parseCsvFile = async (file: File, mapping?: Record<HeaderKey, string>): Promise<ParseResult> => {
   return new Promise((resolve, reject) => {
     Papa.parse<Record<string, string>>(file, {
       header: true,
@@ -125,15 +125,30 @@ export const parseCsvFile = async (file: File): Promise<ParseResult> => {
       transform: (v) => v.trim(),
       complete: (result) => {
         const fields = result.meta.fields ?? [];
-        const { errors: headerErrors } = validateHeaders(fields);
-        if (headerErrors.length > 0) {
-          resolve({ rows: [], headerErrors, rowIssues: [] });
-          return;
+        let data = result.data;
+
+        // Apply column mapping if provided
+        if (mapping) {
+          const reverseMap = Object.entries(mapping).reduce((acc, [target, source]) => {
+            if (source) acc[source] = target as HeaderKey;
+            return acc;
+          }, {} as Record<string, HeaderKey>);
+          data = data.map(row => {
+            const remapped: Record<string, string> = {};
+            Object.entries(row).forEach(([k, v]) => { remapped[reverseMap[k] ?? k] = v; });
+            return remapped as Record<string, string>;
+          });
+          const { errors: headerErrors } = validateHeaders(Object.keys(data[0] ?? {}));
+          if (headerErrors.length > 0) { resolve({ rows: [], headerErrors, rowIssues: [] }); return; }
+          const rows = buildRows(data);
+          const rowIssues = rows.map((r, i) => validateLedgerRow(r, i)).filter((x): x is RowIssue => x !== null);
+          resolve({ rows, headerErrors: [], rowIssues }); return;
         }
+
+        const { errors: headerErrors } = validateHeaders(fields);
+        if (headerErrors.length > 0) { resolve({ rows: [], headerErrors, rowIssues: [] }); return; }
         const rows = buildRows(result.data);
-        const rowIssues = rows
-          .map((r, i) => validateLedgerRow(r, i))
-          .filter((x): x is RowIssue => x !== null);
+        const rowIssues = rows.map((r, i) => validateLedgerRow(r, i)).filter((x): x is RowIssue => x !== null);
         resolve({ rows, headerErrors: [], rowIssues });
       },
       error: reject,
@@ -143,7 +158,7 @@ export const parseCsvFile = async (file: File): Promise<ParseResult> => {
 
 // ─── Excel parser ─────────────────────────────────────────────────────────────
 
-export const parseXlsxFile = async (file: File): Promise<ParseResult> => {
+export const parseXlsxFile = async (file: File, mapping?: Record<HeaderKey, string>): Promise<ParseResult> => {
   const buffer = await file.arrayBuffer();
   const workbook = XLSX.read(buffer, { type: 'array', cellDates: true });
   const sheetName = workbook.SheetNames[0];
@@ -173,12 +188,19 @@ export const parseXlsxFile = async (file: File): Promise<ParseResult> => {
   }
 
   const headerRow = (rawRows[headerRowIndex] as string[]).map((v) => normalizeHeader(String(v)));
-  const { errors: headerErrors } = validateHeaders(headerRow);
+
+  // Apply column mapping if provided
+  const reverseMap = mapping
+    ? Object.entries(mapping).reduce((acc, [target, source]) => { if (source) acc[source] = target; return acc; }, {} as Record<string, string>)
+    : null;
+  const effectiveHeaderRow = reverseMap ? headerRow.map(h => reverseMap[h] ?? h) : headerRow;
+
+  const { errors: headerErrors } = validateHeaders(effectiveHeaderRow);
   if (headerErrors.length > 0) return { rows: [], headerErrors, rowIssues: [] };
 
   const dataRows = rawRows.slice(headerRowIndex + 1).map((rowArr) => {
     const obj: Record<string, unknown> = {};
-    headerRow.forEach((h, i) => {
+    effectiveHeaderRow.forEach((h, i) => {
       obj[h] = (rowArr as unknown[])[i] ?? '';
     });
     return obj;

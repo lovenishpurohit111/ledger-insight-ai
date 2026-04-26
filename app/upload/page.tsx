@@ -11,6 +11,8 @@ import { exportCsv, exportExcel, exportPdf } from '../../src/lib/exportUtils';
 import { FileDropzone, type UploadTheme } from './components/FileDropzone';
 import { PreviewTable } from './components/PreviewTable';
 import { ValidationPanel } from './components/ValidationPanel';
+import { QBOGuide } from './components/QBOGuide';
+import { ColumnMapper } from './components/ColumnMapper';
 import {
   isCsvFile, isExcelFile, parseCsvFile, parseXlsxFile,
   requiredHeaders, CORE_MANDATORY, type LedgerRow, type RowIssue,
@@ -94,6 +96,9 @@ export default function UploadPage() {
   const [cashFlow, setCashFlow] = useState<CashFlowStatement | null>(null);
   const [momPL, setMomPL] = useState<MoMPL | null>(null);
   const [insights, setInsights] = useState<FinancialInsights | null>(null);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [fileHeaders, setFileHeaders] = useState<string[]>([]);
+  const [showMapper, setShowMapper] = useState(false);
   const [headerErrors, setHeaderErrors] = useState<string[]>([]);
   const [rowIssues, setRowIssues] = useState<RowIssue[]>([]);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -107,7 +112,66 @@ export default function UploadPage() {
     setUploadError(null); setHeaderErrors([]); setRowIssues([]);
     setPreviewRows([]); setAnalysis(null); setProfitAndLoss(null);
     setBalanceSheet(null); setCashFlow(null); setMomPL(null); setInsights(null);
+    setPendingFile(null); setFileHeaders([]); setShowMapper(false);
   };
+
+  const processRows = useCallback((rows: LedgerRow[], rowIssues: RowIssue[]) => {
+    const plResult = generatePL(rows);
+    setAnalysis(analyzeLedger(rows));
+    setProfitAndLoss(plResult);
+    setBalanceSheet(generateBalanceSheet(rows));
+    setCashFlow(generateCashFlow(rows, plResult));
+    setMomPL(generateMoMPL(rows));
+    setInsights(generateInsights(rows));
+    setPreviewRows(rows.slice(0, 100));
+    setRowIssues(rowIssues);
+    setView('dashboard');
+    setActiveTab('overview');
+  }, []);
+
+  const detectFileHeaders = async (file: File): Promise<string[]> => {
+    return new Promise((resolve) => {
+      if (isCsvFile(file)) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const firstLine = (e.target?.result as string).split('\n')[0] ?? '';
+          resolve(firstLine.split(',').map(h => h.trim().replace(/^"|"$/g, '')));
+        };
+        reader.readAsText(file);
+      } else {
+        import('xlsx').then(XLSX => {
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            const wb = XLSX.read(e.target?.result, { type: 'array' });
+            const ws = wb.Sheets[wb.SheetNames[0]];
+            const rows = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, defval: '', raw: false }) as unknown[][];
+            // Find first row with 3+ non-empty cells
+            for (const row of rows.slice(0, 20)) {
+              const vals = (row as string[]).map(v => String(v ?? '').trim()).filter(Boolean);
+              if (vals.length >= 3) { resolve(vals); return; }
+            }
+            resolve([]);
+          };
+          reader.readAsArrayBuffer(file);
+        });
+      }
+    });
+  };
+
+  const handleMappingConfirmed = useCallback(async (mapping: Record<HeaderKey, string>) => {
+    if (!pendingFile) return;
+    setShowMapper(false);
+    setHeaderErrors([]);
+    try {
+      const result = isCsvFile(pendingFile)
+        ? await parseCsvFile(pendingFile, mapping)
+        : await parseXlsxFile(pendingFile, mapping);
+      if (result.headerErrors.length > 0) { setHeaderErrors(result.headerErrors); return; }
+      processRows(result.rows, result.rowIssues);
+    } catch {
+      setUploadError('Unable to parse file with the provided mapping.');
+    }
+  }, [pendingFile, processRows]);
 
   const handleParse = useCallback(async (file: File) => {
     clearState();
@@ -120,7 +184,19 @@ export default function UploadPage() {
       const result = isCsvFile(file) ? await parseCsvFile(file) : await parseXlsxFile(file);
       setHeaderErrors(result.headerErrors);
       setRowIssues(result.rowIssues);
-      if (result.headerErrors.length > 0) { setPreviewRows([]); return; }
+
+      // If mandatory headers missing — check if file has OTHER headers we can remap
+      if (result.headerErrors.length > 0) {
+        const detectedHeaders = await detectFileHeaders(file);
+        if (detectedHeaders.length > 0) {
+          setFileHeaders(detectedHeaders);
+          setPendingFile(file);
+          setShowMapper(true);
+          return;
+        }
+        setPreviewRows([]);
+        return;
+      }
       const plResult = generatePL(result.rows);
       setAnalysis(analyzeLedger(result.rows));
       setProfitAndLoss(plResult);
@@ -195,10 +271,19 @@ export default function UploadPage() {
                 <a href="/samples/sample-ledger.xlsx" download className="rounded-lg bg-cyan-600 px-4 py-2 text-sm font-semibold text-white shadow transition-colors hover:bg-cyan-700">↓ XLSX Sample</a>
               </div>
             </div>
+            <QBOGuide theme={theme} />
             <FileDropzone fileName={fileName} isDragging={isDragging} theme={theme}
               onFileChange={handleFileChange} onDragOver={handleDragOver}
               onDragLeave={() => setIsDragging(false)} onDrop={handleDrop} />
-            {(uploadError || headerErrors.length > 0 || rowIssues.length > 0) && (
+            {showMapper && fileHeaders.length > 0 && (
+              <ColumnMapper
+                theme={theme}
+                fileHeaders={fileHeaders}
+                onMappingConfirmed={handleMappingConfirmed}
+                onCancel={() => { setShowMapper(false); setHeaderErrors([]); setPendingFile(null); }}
+              />
+            )}
+            {!showMapper && (uploadError || headerErrors.length > 0 || rowIssues.length > 0) && (
               <ValidationPanel headerErrors={headerErrors} uploadError={uploadError} rowIssues={rowIssues} theme={theme} />
             )}
             <div className={`rounded-2xl border p-5 ${ui.panel}`}>
