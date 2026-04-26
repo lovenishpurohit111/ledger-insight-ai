@@ -6,6 +6,7 @@ import { generateBalanceSheet, type BalanceSheet } from '../../src/lib/generateB
 import { generateCashFlow, type CashFlowStatement } from '../../src/lib/generateCashFlow';
 import { generatePL, type ProfitAndLoss } from '../../src/lib/generatePL';
 import { generateMoMPL, monthLabel, momChange, type MoMPL } from '../../src/lib/generateMoMPL';
+import { generateInsights, type FinancialInsights } from '../../src/lib/generateInsights';
 import { exportCsv, exportExcel, exportPdf } from '../../src/lib/exportUtils';
 import { FileDropzone, type UploadTheme } from './components/FileDropzone';
 import { PreviewTable } from './components/PreviewTable';
@@ -78,7 +79,7 @@ const themes: Record<UploadTheme, ThemeClasses> = {
   },
 };
 
-type Tab = 'overview' | 'pl' | 'bs' | 'cashflow' | 'mom' | 'preview';
+type Tab = 'overview' | 'insights' | 'pl' | 'bs' | 'cashflow' | 'mom' | 'preview';
 
 export default function UploadPage() {
   const [theme, setTheme] = useState<UploadTheme>('dark');
@@ -92,6 +93,7 @@ export default function UploadPage() {
   const [balanceSheet, setBalanceSheet] = useState<BalanceSheet | null>(null);
   const [cashFlow, setCashFlow] = useState<CashFlowStatement | null>(null);
   const [momPL, setMomPL] = useState<MoMPL | null>(null);
+  const [insights, setInsights] = useState<FinancialInsights | null>(null);
   const [headerErrors, setHeaderErrors] = useState<string[]>([]);
   const [rowIssues, setRowIssues] = useState<RowIssue[]>([]);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -104,7 +106,7 @@ export default function UploadPage() {
   const clearState = () => {
     setUploadError(null); setHeaderErrors([]); setRowIssues([]);
     setPreviewRows([]); setAnalysis(null); setProfitAndLoss(null);
-    setBalanceSheet(null); setCashFlow(null); setMomPL(null);
+    setBalanceSheet(null); setCashFlow(null); setMomPL(null); setInsights(null);
   };
 
   const handleParse = useCallback(async (file: File) => {
@@ -125,6 +127,7 @@ export default function UploadPage() {
       setBalanceSheet(generateBalanceSheet(result.rows));
       setCashFlow(generateCashFlow(result.rows, plResult));
       setMomPL(generateMoMPL(result.rows));
+      setInsights(generateInsights(result.rows));
       setPreviewRows(result.rows.slice(0, 100));
       setView('dashboard');
       setActiveTab('overview');
@@ -149,6 +152,8 @@ export default function UploadPage() {
   }, []);
 
   const handleUploadNew = () => { clearState(); setFileName(''); setView('upload'); };
+
+  const parseCurrencyAmountClient = (v: string) => { const s = v.trim(); if (!s) return 0; const neg = s.startsWith('(') || s.startsWith('-'); return (neg ? -1 : 1) * Math.abs(Number(s.replace(/[,$() -]/g, '')) || 0); };
 
   const ThemeToggle = () => (
     <div className={`flex rounded-full p-1 text-xs font-semibold ${ui.settingsControl}`}>
@@ -220,6 +225,7 @@ export default function UploadPage() {
 
   const TABS: { id: Tab; label: string }[] = [
     { id: 'overview', label: 'Overview' },
+    { id: 'insights', label: '🔍 Insights' },
     { id: 'pl',       label: 'P&L' },
     { id: 'bs',       label: 'Balance Sheet' },
     { id: 'cashflow', label: 'Cash Flow' },
@@ -352,6 +358,166 @@ export default function UploadPage() {
           </div>
         )}
 
+        {/* ── INSIGHTS TAB ── */}
+        {activeTab === 'insights' && insights && profitAndLoss && balanceSheet && (
+          <div className="space-y-6">
+            {/* Burn Rate & Runway */}
+            <div className={`rounded-3xl border p-6 ${ui.panel}`}>
+              <p className={`text-xs font-semibold uppercase tracking-widest ${ui.label}`}>Cash Intelligence</p>
+              <h2 className={`mt-0.5 text-xl font-bold ${ui.heading}`}>Burn Rate &amp; Runway</h2>
+              <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                {metricCard('Cash Balance', fmt.format(insights.cashBalance))}
+                {metricCard('Avg Monthly Burn', fmt.format(insights.avgMonthlyBurn))}
+                {metricCard('Avg Monthly Revenue', fmt.format(insights.avgMonthlyRevenue))}
+                <div className={`rounded-2xl p-4 ${insights.runwayMonths !== null && insights.runwayMonths < 3 ? ui.dangerPill : insights.runwayMonths !== null && insights.runwayMonths < 6 ? ui.warningRow : ui.successCard}`}>
+                  <p className="text-sm">Cash Runway</p>
+                  <p className="mt-2 text-2xl font-semibold">{insights.runwayMonths !== null ? `${insights.runwayMonths.toFixed(1)} mo` : '∞'}</p>
+                  <p className="mt-1 text-xs opacity-70">{insights.runwayMonths === null ? 'Revenue covers burn' : insights.runwayMonths < 3 ? '⚠️ Critical' : insights.runwayMonths < 6 ? '⚠️ Watch closely' : '✅ Healthy'}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Financial Ratios */}
+            <div className={`rounded-3xl border p-6 ${ui.panel}`}>
+              <p className={`text-xs font-semibold uppercase tracking-widest ${ui.label}`}>Solvency &amp; Liquidity</p>
+              <h2 className={`mt-0.5 text-xl font-bold ${ui.heading}`}>Financial Ratios</h2>
+              <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                {(() => {
+                  const { currentRatio, quickRatio, debtToEquity, debtRatio } = balanceSheet.ratios;
+                  const pct = (v: number) => `${(v * 100).toFixed(1)}%`;
+                  const ratio = (label: string, val: number | null, good: (v: number) => boolean, tip: string) => (
+                    <div className={`rounded-2xl p-4 ${val !== null && good(val) ? ui.successCard : val !== null ? ui.dangerPill : ui.card}`}>
+                      <p className="text-sm">{label}</p>
+                      <p className="mt-2 text-2xl font-semibold">{val !== null ? val.toFixed(2) : 'N/A'}</p>
+                      <p className="mt-1 text-xs opacity-70">{tip}</p>
+                    </div>
+                  );
+                  return <>
+                    {ratio('Current Ratio', currentRatio, v => v >= 1.5, 'Healthy ≥ 1.5 · Current Assets / Current Liabilities')}
+                    {ratio('Quick Ratio', quickRatio, v => v >= 1.0, 'Healthy ≥ 1.0 · Liquid Assets / Current Liabilities')}
+                    {ratio('Debt-to-Equity', debtToEquity, v => v <= 2.0, 'Healthy ≤ 2.0 · Total Debt / Equity')}
+                    {ratio('Debt Ratio', debtRatio, v => v <= 0.5, 'Healthy ≤ 50% · Total Debt / Total Assets')}
+                  </>;
+                })()}
+              </div>
+              <div className={`mt-4 grid gap-4 sm:grid-cols-3 rounded-2xl p-4 ${ui.card}`}>
+                {metricCard('Gross Margin', `${(profitAndLoss.grossMargin * 100).toFixed(1)}%`)}
+                {metricCard('Net Margin', `${(profitAndLoss.netMargin * 100).toFixed(1)}%`)}
+                {metricCard('Tax Estimate', fmt.format(insights.taxEstimate.amount))}
+              </div>
+            </div>
+
+            {/* Top Vendors + Revenue Sources */}
+            <div className="grid gap-6 lg:grid-cols-2">
+              <div className={`rounded-3xl border p-6 ${ui.panel}`}>
+                <p className={`text-xs font-semibold uppercase tracking-widest ${ui.label}`}>Pareto Analysis</p>
+                <h2 className={`mt-0.5 text-xl font-bold ${ui.heading}`}>Top Vendors by Spend</h2>
+                <div className="mt-4 space-y-2">
+                  {insights.topVendors.map((v, i) => {
+                    const totalSpend = insights.topVendors.reduce((t, x) => t + x.total, 0);
+                    const pct = totalSpend ? (v.total / totalSpend * 100).toFixed(1) : '0';
+                    return (
+                      <div key={v.name} className={`rounded-xl px-4 py-3 ${ui.listRow}`}>
+                        <div className="flex items-center justify-between">
+                          <span className={`font-semibold text-sm ${ui.stat}`}>#{i+1} {v.name}</span>
+                          <span className="text-sm font-bold">{fmt.format(v.total)}</span>
+                        </div>
+                        <div className="mt-1.5 h-1.5 rounded-full bg-slate-700">
+                          <div className="h-1.5 rounded-full bg-cyan-500" style={{ width: `${pct}%` }} />
+                        </div>
+                        <p className={`mt-1 text-xs ${ui.muted}`}>{pct}% of tracked spend · {v.txCount} transactions</p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className={`rounded-3xl border p-6 ${ui.panel}`}>
+                <p className={`text-xs font-semibold uppercase tracking-widest ${ui.label}`}>Pareto Analysis</p>
+                <h2 className={`mt-0.5 text-xl font-bold ${ui.heading}`}>Top Revenue Sources</h2>
+                <div className="mt-4 space-y-2">
+                  {insights.topRevenueSources.length === 0 ? (
+                    <p className={`text-sm ${ui.muted}`}>No named revenue sources found.</p>
+                  ) : insights.topRevenueSources.map((r, i) => {
+                    const totalRev = insights.topRevenueSources.reduce((t, x) => t + x.total, 0);
+                    const pct = totalRev ? (r.total / totalRev * 100).toFixed(1) : '0';
+                    return (
+                      <div key={r.name} className={`rounded-xl px-4 py-3 ${ui.listRow}`}>
+                        <div className="flex items-center justify-between">
+                          <span className={`font-semibold text-sm ${ui.stat}`}>#{i+1} {r.name}</span>
+                          <span className="text-sm font-bold">{fmt.format(r.total)}</span>
+                        </div>
+                        <div className="mt-1.5 h-1.5 rounded-full bg-slate-700">
+                          <div className="h-1.5 rounded-full bg-emerald-500" style={{ width: `${pct}%` }} />
+                        </div>
+                        <p className={`mt-1 text-xs ${ui.muted}`}>{pct}% of tracked revenue · {r.txCount} transactions</p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* Anomalies + Audit Flags */}
+            <div className="grid gap-6 lg:grid-cols-2">
+              {insights.anomalies.length > 0 && (
+                <div className={`rounded-3xl border p-6 ${ui.panel}`}>
+                  <p className={`text-xs font-semibold uppercase tracking-widest ${ui.label}`}>Statistical Detection</p>
+                  <h2 className={`mt-0.5 text-xl font-bold ${ui.heading}`}>Anomalous Transactions</h2>
+                  <p className={`mt-1 text-sm ${ui.muted}`}>Transactions &gt;3σ above average amount.</p>
+                  <div className="mt-4 space-y-2 max-h-72 overflow-y-auto">
+                    {insights.anomalies.map((a, i) => (
+                      <div key={i} className={`rounded-xl px-4 py-3 text-sm ${ui.warningRow}`}>
+                        <div className="flex justify-between">
+                          <span className="font-semibold">{a.row.Name || a.row['Distribution account']}</span>
+                          <span className="font-bold">{fmt.format(a.amount)}</span>
+                        </div>
+                        <p className="text-xs mt-0.5 opacity-80">{a.row['Transaction date']} · {a.reason}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {insights.auditFlags.length > 0 && (
+                <div className={`rounded-3xl border p-6 ${ui.panel}`}>
+                  <p className={`text-xs font-semibold uppercase tracking-widest ${ui.label}`}>Audit Checks</p>
+                  <h2 className={`mt-0.5 text-xl font-bold ${ui.heading}`}>Audit Flags</h2>
+                  <div className="mt-4 space-y-3">
+                    {insights.auditFlags.map((flag, i) => (
+                      <div key={i} className={`rounded-xl px-4 py-3 ${ui.warningRow}`}>
+                        <p className="text-sm font-semibold">{flag.type === 'round' ? '🔵' : flag.type === 'weekend' ? '📅' : flag.type === 'gap' ? '🔴' : '⚠️'} {flag.description}</p>
+                        {flag.rows.length > 0 && (
+                          <div className="mt-2 space-y-1">
+                            {flag.rows.slice(0, 3).map((r, j) => (
+                              <p key={j} className="text-xs opacity-80">{r['Transaction date']} · {r.Name} · {fmt.format(Math.abs(parseCurrencyAmountClient(r.Amount)))}</p>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Tax estimate */}
+            <div className={`rounded-3xl border p-6 ${ui.panel}`}>
+              <p className={`text-xs font-semibold uppercase tracking-widest ${ui.label}`}>Planning</p>
+              <h2 className={`mt-0.5 text-xl font-bold ${ui.heading}`}>Tax Estimate</h2>
+              <div className="mt-5 grid gap-4 sm:grid-cols-3">
+                {metricCard('Rate', `${(insights.taxEstimate.rate * 100).toFixed(0)}%`)}
+                {metricCard('Estimated Tax', fmt.format(insights.taxEstimate.amount))}
+                <div className={`rounded-2xl p-4 text-sm ${ui.card} ${ui.muted}`}>
+                  <p className="font-semibold mb-1">Basis</p>
+                  <p>{insights.taxEstimate.basis}</p>
+                  <p className="mt-2 text-xs opacity-70">⚠️ Estimate only — consult a tax professional.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* ── P&L TAB ── */}
         {activeTab === 'pl' && profitAndLoss && (
           <div className={`rounded-3xl border p-6 ${ui.panel}`}>
@@ -364,12 +530,14 @@ export default function UploadPage() {
                 Net {fmt.format(profitAndLoss.netProfit)}
               </div>
             </div>
-            <div className="mt-5 grid gap-4 sm:grid-cols-3">
+            <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {metricCard('Revenue', fmt.format(profitAndLoss.totalRevenue))}
-              {metricCard('Expenses', fmt.format(profitAndLoss.totalExpenses))}
+              {metricCard('COGS', fmt.format(profitAndLoss.totalCogs))}
+              {metricCard('Gross Profit', `${fmt.format(profitAndLoss.grossProfit)} (${(profitAndLoss.grossMargin*100).toFixed(1)}%)`)}
               <div className={`rounded-2xl border p-4 ${ui.successCard}`}>
                 <p className="text-sm">Net Profit</p>
                 <p className="mt-2 text-2xl font-semibold">{fmt.format(profitAndLoss.netProfit)}</p>
+                <p className="mt-1 text-xs opacity-70">Margin: {(profitAndLoss.netMargin*100).toFixed(1)}%</p>
               </div>
             </div>
             {Object.keys(profitAndLoss.monthlyBreakdown).length > 0 && (

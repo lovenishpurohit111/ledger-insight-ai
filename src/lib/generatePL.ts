@@ -1,100 +1,68 @@
 import type { LedgerRow } from '../../app/upload/upload-utils';
-import { isExpenseType, isRevenueType, parseCurrencyAmount, roundCurrency } from './accounting';
+import { isCogsType, isExpenseType, isRevenueType, parseCurrencyAmount, roundCurrency } from './accounting';
 
-export type MonthlyPLSummary = {
-  revenue: number;
-  expenses: number;
-};
+export type MonthlyPLSummary = { revenue: number; cogs: number; expenses: number };
 
 export type ProfitAndLoss = {
   totalRevenue: number;
-  totalExpenses: number;
+  totalCogs: number;
+  grossProfit: number;
+  grossMargin: number;       // 0–1
+  totalExpenses: number;     // opex only (excl COGS)
+  totalAllExpenses: number;  // cogs + opex
   netProfit: number;
+  netMargin: number;         // 0–1
   monthlyBreakdown: Record<string, MonthlyPLSummary>;
 };
 
-const parseAmount = (value: string) => {
-  return parseCurrencyAmount(value) ?? 0;
-};
+const pad = (v: number) => String(v).padStart(2, '0');
 
-const padMonth = (value: number) => String(value).padStart(2, '0');
-
-const extractMonthKey = (value: string) => {
-  const normalized = value.trim();
-  if (!normalized) {
-    return null;
-  }
-
-  const isoMatch = normalized.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$/);
-  if (isoMatch) {
-    const [, year, month] = isoMatch;
-    const monthNumber = Number(month);
-    if (monthNumber >= 1 && monthNumber <= 12) {
-      return `${year}-${padMonth(monthNumber)}`;
-    }
-  }
-
-  const slashMatch = normalized.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (slashMatch) {
-    const [, month, , year] = slashMatch;
-    const monthNumber = Number(month);
-    if (monthNumber >= 1 && monthNumber <= 12) {
-      return `${year}-${padMonth(monthNumber)}`;
-    }
-  }
-
-  const parsedDate = new Date(normalized);
-  if (Number.isNaN(parsedDate.getTime())) {
-    return null;
-  }
-
-  return `${parsedDate.getFullYear()}-${padMonth(parsedDate.getMonth() + 1)}`;
-};
-
-const updateMonthlyBreakdown = (
-  monthlyBreakdown: Record<string, MonthlyPLSummary>,
-  monthKey: string | null,
-  amount: number,
-  category: 'revenue' | 'expenses',
-) => {
-  if (!monthKey) {
-    return;
-  }
-
-  const entry = monthlyBreakdown[monthKey] ?? { revenue: 0, expenses: 0 };
-  entry[category] = roundCurrency(entry[category] + amount);
-  monthlyBreakdown[monthKey] = entry;
+export const extractMonthKey = (value: string): string | null => {
+  const s = value.trim();
+  if (!s) return null;
+  const iso = s.match(/^(\d{4})[-/](\d{1,2})[-/]\d{1,2}$/);
+  if (iso) { const m = Number(iso[2]); if (m >= 1 && m <= 12) return `${iso[1]}-${pad(m)}`; }
+  const slash = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (slash) { const m = Number(slash[1]); if (m >= 1 && m <= 12) return `${slash[3]}-${pad(m)}`; }
+  const d = new Date(s);
+  if (!isNaN(d.getTime())) return `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
+  return null;
 };
 
 export function generatePL(rows: LedgerRow[]): ProfitAndLoss {
-  const monthlyBreakdown: Record<string, MonthlyPLSummary> = {};
-  let totalRevenue = 0;
-  let totalExpenses = 0;
+  const monthly: Record<string, MonthlyPLSummary> = {};
+  let totalRevenue = 0, totalCogs = 0, totalExpenses = 0;
 
   rows.forEach((row) => {
-    const accountType = row['Distribution account type'];
-    const amount = parseAmount(row.Amount);
-    const monthKey = extractMonthKey(row['Transaction date']);
+    const t = row['Distribution account type'];
+    const amount = parseCurrencyAmount(row.Amount) ?? 0;
+    const mk = extractMonthKey(row['Transaction date']);
+    if (mk && !monthly[mk]) monthly[mk] = { revenue: 0, cogs: 0, expenses: 0 };
 
-    if (isRevenueType(accountType)) {
+    if (isRevenueType(t)) {
       totalRevenue = roundCurrency(totalRevenue + amount);
-      updateMonthlyBreakdown(monthlyBreakdown, monthKey, amount, 'revenue');
-    }
-
-    if (isExpenseType(accountType)) {
+      if (mk) monthly[mk].revenue = roundCurrency(monthly[mk].revenue + amount);
+    } else if (isCogsType(t)) {
+      totalCogs = roundCurrency(totalCogs + amount);
+      if (mk) monthly[mk].cogs = roundCurrency(monthly[mk].cogs + amount);
+    } else if (isExpenseType(t)) {
       totalExpenses = roundCurrency(totalExpenses + amount);
-      updateMonthlyBreakdown(monthlyBreakdown, monthKey, amount, 'expenses');
+      if (mk) monthly[mk].expenses = roundCurrency(monthly[mk].expenses + amount);
     }
   });
 
-  const sortedMonthlyBreakdown = Object.fromEntries(
-    Object.entries(monthlyBreakdown).sort(([leftMonth], [rightMonth]) => leftMonth.localeCompare(rightMonth)),
-  );
+  const grossProfit = roundCurrency(totalRevenue - totalCogs);
+  const netProfit = roundCurrency(grossProfit - totalExpenses);
 
   return {
     totalRevenue,
+    totalCogs,
+    grossProfit,
+    grossMargin: totalRevenue ? roundCurrency(grossProfit / totalRevenue) : 0,
     totalExpenses,
-    netProfit: roundCurrency(totalRevenue - totalExpenses),
-    monthlyBreakdown: sortedMonthlyBreakdown,
+    totalAllExpenses: roundCurrency(totalCogs + totalExpenses),
+    netProfit,
+    netMargin: totalRevenue ? roundCurrency(netProfit / totalRevenue) : 0,
+    monthlyBreakdown: Object.fromEntries(Object.entries(monthly).sort()),
   };
 }
