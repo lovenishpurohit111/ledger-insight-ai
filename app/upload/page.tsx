@@ -253,8 +253,8 @@ export default function UploadPage() {
 
   if (view === 'upload') {
     return (
-      <div className={`min-h-screen px-4 py-10 ${ui.page}`}>
-        <div className={`mx-auto w-full max-w-5xl rounded-3xl border p-8 ${ui.shell}`}>
+      <div className={`min-h-screen px-6 py-8 ${ui.page}`}>
+        <div className={`w-full rounded-3xl border p-8 ${ui.shell}`}>
           <div className="space-y-6">
             <div className="flex items-center justify-between">
               <div>
