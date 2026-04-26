@@ -184,6 +184,7 @@ export default function UploadPage() {
               <div>
                 <h1 className={`text-2xl font-bold ${ui.heading}`}>Ledger Insight AI</h1>
                 <p className={`mt-1 text-sm ${ui.muted}`}>Upload a ledger file to generate financial reports.</p>
+                <p className={`mt-1 text-xs ${ui.muted}`}>Built by <span className={`font-semibold ${ui.body}`}>Lovenish Purohit</span></p>
               </div>
               <ThemeToggle />
             </div>
