@@ -15,7 +15,7 @@ import { QBOGuide } from './components/QBOGuide';
 import { ColumnMapper } from './components/ColumnMapper';
 import {
   isCsvFile, isExcelFile, parseCsvFile, parseXlsxFile,
-  requiredHeaders, CORE_MANDATORY, type LedgerRow, type RowIssue,
+  requiredHeaders, CORE_MANDATORY, type LedgerRow, type RowIssue, type HeaderKey,
 } from './upload-utils';
 
 type ThemeClasses = {
