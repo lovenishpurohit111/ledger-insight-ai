@@ -254,7 +254,7 @@ export default function UploadPage() {
   if (view === 'upload') {
     return (
       <div className={`min-h-screen px-4 py-10 ${ui.page}`}>
-        <div className={`mx-auto w-full max-w-3xl rounded-3xl border p-8 ${ui.shell}`}>
+        <div className={`mx-auto w-full max-w-5xl rounded-3xl border p-8 ${ui.shell}`}>
           <div className="space-y-6">
             <div className="flex items-center justify-between">
               <div>
@@ -264,41 +264,46 @@ export default function UploadPage() {
               </div>
               <ThemeToggle />
             </div>
-            <div className={`rounded-2xl border p-5 ${ui.panel}`}>
-              <h2 className={`text-sm font-semibold uppercase tracking-widest ${ui.label}`}>Sample Files</h2>
-              <div className="mt-3 flex flex-wrap gap-3">
-                <a href="/samples/sample-ledger.csv" download className="rounded-lg bg-cyan-600 px-4 py-2 text-sm font-semibold text-white shadow transition-colors hover:bg-cyan-700">↓ CSV Sample</a>
-                <a href="/samples/sample-ledger.xlsx" download className="rounded-lg bg-cyan-600 px-4 py-2 text-sm font-semibold text-white shadow transition-colors hover:bg-cyan-700">↓ XLSX Sample</a>
+
+            <div className="grid gap-6 lg:grid-cols-2">
+              <div className="space-y-4">
+                <div className={`rounded-2xl border p-5 ${ui.panel}`}>
+                  <h2 className={`text-sm font-semibold uppercase tracking-widest ${ui.label}`}>Sample Files</h2>
+                  <div className="mt-3 flex flex-wrap gap-3">
+                    <a href="/samples/sample-ledger.csv" download className="rounded-lg bg-cyan-600 px-4 py-2 text-sm font-semibold text-white shadow transition-colors hover:bg-cyan-700">↓ CSV Sample</a>
+                    <a href="/samples/sample-ledger.xlsx" download className="rounded-lg bg-cyan-600 px-4 py-2 text-sm font-semibold text-white shadow transition-colors hover:bg-cyan-700">↓ XLSX Sample</a>
+                  </div>
+                </div>
+                <FileDropzone fileName={fileName} isDragging={isDragging} theme={theme}
+                  onFileChange={handleFileChange} onDragOver={handleDragOver}
+                  onDragLeave={() => setIsDragging(false)} onDrop={handleDrop} />
+                {showMapper && fileHeaders.length > 0 && (
+                  <ColumnMapper theme={theme} fileHeaders={fileHeaders}
+                    onMappingConfirmed={handleMappingConfirmed}
+                    onCancel={() => { setShowMapper(false); setHeaderErrors([]); setPendingFile(null); }} />
+                )}
+                {!showMapper && (uploadError || headerErrors.length > 0 || rowIssues.length > 0) && (
+                  <ValidationPanel headerErrors={headerErrors} uploadError={uploadError} rowIssues={rowIssues} theme={theme} />
+                )}
               </div>
-            </div>
-            <QBOGuide theme={theme} />
-            <FileDropzone fileName={fileName} isDragging={isDragging} theme={theme}
-              onFileChange={handleFileChange} onDragOver={handleDragOver}
-              onDragLeave={() => setIsDragging(false)} onDrop={handleDrop} />
-            {showMapper && fileHeaders.length > 0 && (
-              <ColumnMapper
-                theme={theme}
-                fileHeaders={fileHeaders}
-                onMappingConfirmed={handleMappingConfirmed}
-                onCancel={() => { setShowMapper(false); setHeaderErrors([]); setPendingFile(null); }}
-              />
-            )}
-            {!showMapper && (uploadError || headerErrors.length > 0 || rowIssues.length > 0) && (
-              <ValidationPanel headerErrors={headerErrors} uploadError={uploadError} rowIssues={rowIssues} theme={theme} />
-            )}
-            <div className={`rounded-2xl border p-5 ${ui.panel}`}>
-              <h2 className={`text-sm font-semibold uppercase tracking-widest ${ui.label}`}>Required Headers</h2>
-              <p className={`mt-1 text-xs ${ui.muted}`}>Columns marked ✱ are strictly mandatory — the file will be rejected without them.</p>
-              <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                {requiredHeaders.map((h) => {
-                  const mandatory = CORE_MANDATORY.includes(h as typeof CORE_MANDATORY[number]);
-                  return (
-                    <div key={h} className={`rounded-xl px-4 py-2.5 text-sm flex items-center justify-between ${mandatory ? (theme === 'dark' ? 'bg-cyan-950/60 text-cyan-200 border border-cyan-700' : 'bg-cyan-50 text-cyan-800 border border-cyan-200') : `${ui.card} ${ui.body}`}`}>
-                      <span>{h}</span>
-                      {mandatory && <span className="text-xs font-bold opacity-70">✱</span>}
-                    </div>
-                  );
-                })}
+
+              <div className="space-y-4">
+                <QBOGuide theme={theme} />
+                <div className={`rounded-2xl border p-5 ${ui.panel}`}>
+                  <h2 className={`text-sm font-semibold uppercase tracking-widest ${ui.label}`}>Required Headers</h2>
+                  <p className={`mt-1 text-xs ${ui.muted}`}>Columns marked ✱ are strictly mandatory.</p>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    {requiredHeaders.map((h) => {
+                      const mandatory = CORE_MANDATORY.includes(h as typeof CORE_MANDATORY[number]);
+                      return (
+                        <div key={h} className={`rounded-xl px-4 py-2.5 text-sm flex items-center justify-between ${mandatory ? (theme === 'dark' ? 'bg-cyan-950/60 text-cyan-200 border border-cyan-700' : 'bg-cyan-50 text-cyan-800 border border-cyan-200') : `${ui.card} ${ui.body}`}`}>
+                          <span>{h}</span>
+                          {mandatory && <span className="text-xs font-bold opacity-70">✱</span>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
             </div>
           </div>
