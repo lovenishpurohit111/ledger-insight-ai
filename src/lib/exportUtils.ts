@@ -32,7 +32,7 @@ const hdr = (bgHex: string, fgHex = WHITE, bold = true, sz = 11): CS => ({
 
 const cell = (bold = false, color = BLACK, align: 'left'|'right'|'center' = 'left', bg?: string): CS => ({
   font: { bold, color: { rgb: color }, sz: 10, name: 'Calibri' },
-  fill: bg ? { fgColor: { rgb: bg }, patternType: 'solid' } : { patternType: 'none' },
+  ...(bg ? { fill: { fgColor: { rgb: bg }, patternType: 'solid' } } : {}),
   alignment: { horizontal: align, vertical: 'center' },
   border: { bottom: { style: 'hair', color: { rgb: DGRAY } } },
 });
@@ -138,10 +138,10 @@ export function exportExcel(fileName: string, analysis: LedgerAnalysis, pl: Prof
     ws['B11'] = { v: bs.totals.equityTotal, t: 'n', s: money() };
     ws['A12'] = { v: 'Liabilities + Equity', t: 's', s: cell(true) };
     ws['B12'] = { v: bs.totals.liabilitiesTotal + bs.totals.equityTotal, t: 'n', s: money(true) };
-    ws['C12'] = { v: '=B10+B11', t: 'n', s: { ...money(), font: { color: { rgb: '888888' }, sz: 9, name: 'Calibri', italic: true } } };
+    ws['C12'] = { v: bs.totals.liabilitiesTotal + bs.totals.equityTotal, t: 'n', s: { ...money(), font: { color: { rgb: '888888' }, sz: 9, name: 'Calibri', italic: true } } };
     ws['A13'] = { v: 'Variance (A − L − E)', t: 's', s: cell(true, bs.isBalanced ? GREEN : RED) };
     ws['B13'] = { v: bs.variance, t: 'n', s: money(true, bs.isBalanced ? GREEN : RED) };
-    ws['C13'] = { v: '=B9-B12', t: 'n', s: { ...money(), font: { color: { rgb: '888888' }, sz: 9, name: 'Calibri', italic: true } } };
+    ws['C13'] = { v: bs.variance, t: 'n', s: { ...money(), font: { color: { rgb: '888888' }, sz: 9, name: 'Calibri', italic: true } } };
     ws['A14'] = { v: 'Status', t: 's', s: cell(true) };
     ws['B14'] = { v: bs.isBalanced ? 'BALANCED ✅' : `NOT BALANCED ❌ (Δ ${fmt(bs.variance)})`, t: 's', s: { ...cell(true, bs.isBalanced ? GREEN : RED), fill: { fgColor: { rgb: bs.isBalanced ? 'E2EFDA' : 'FFDCDC' }, patternType: 'solid' } } };
 
@@ -162,7 +162,7 @@ export function exportExcel(fileName: string, analysis: LedgerAnalysis, pl: Prof
       { s: { r: 15, c: 0 }, e: { r: 15, c: 2 } },
     ];
     ws['!ref'] = 'A1:E18';
-    XLSX.utils.book_append_sheet(wb, ws, '📊 Summary');
+    XLSX.utils.book_append_sheet(wb, ws, 'Summary');
   }
 
   // ── 2. P&L ──────────────────────────────────────────────────────────────────
@@ -222,7 +222,7 @@ export function exportExcel(fileName: string, analysis: LedgerAnalysis, pl: Prof
     ws['!cols'] = [colWidth(28), colWidth(16), colWidth(16), colWidth(16), colWidth(12)];
     ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 4 } }, { s: { r: 1, c: 0 }, e: { r: 1, c: 4 } }];
     ws['!freeze'] = { xSplit: 0, ySplit: mHdrRow };
-    XLSX.utils.book_append_sheet(wb, ws, '📈 P&L');
+    XLSX.utils.book_append_sheet(wb, ws, 'PL');
   }
 
   // ── 3. Balance Sheet ─────────────────────────────────────────────────────────
@@ -291,7 +291,7 @@ export function exportExcel(fileName: string, analysis: LedgerAnalysis, pl: Prof
 
     ws['!cols'] = [colWidth(34), colWidth(18), colWidth(12)];
     ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 2 } }, { s: { r: 1, c: 0 }, e: { r: 1, c: 2 } }];
-    XLSX.utils.book_append_sheet(wb, ws, '⚖️ Balance Sheet');
+    XLSX.utils.book_append_sheet(wb, ws, 'Balance Sheet');
   }
 
   // ── 4. Cash Flow ─────────────────────────────────────────────────────────────
@@ -323,7 +323,7 @@ export function exportExcel(fileName: string, analysis: LedgerAnalysis, pl: Prof
     setStyle(ws, `B${lastR}`, { ...money(true, WHITE), fill: { fgColor: { rgb: cf.operatingCashFlow >= 0 ? GREEN : RED }, patternType: 'solid' } });
     ws['!cols'] = [colWidth(38), colWidth(18)];
     ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 1 } }, { s: { r: 1, c: 0 }, e: { r: 1, c: 1 } }];
-    XLSX.utils.book_append_sheet(wb, ws, '💵 Cash Flow');
+    XLSX.utils.book_append_sheet(wb, ws, 'Cash Flow');
   }
 
   // ── 5. Month-over-Month P&L ──────────────────────────────────────────────────
@@ -448,7 +448,7 @@ export function exportExcel(fileName: string, analysis: LedgerAnalysis, pl: Prof
     ws['!cols'] = [colWidth(32), ...months.map(() => colWidth(14)), colWidth(14), ...months.slice(1).map(() => colWidth(12))];
     ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: numCols - 1 } }, { s: { r: 1, c: 0 }, e: { r: 1, c: numCols - 1 } }];
     ws['!freeze'] = { xSplit: 1, ySplit: 4 };
-    XLSX.utils.book_append_sheet(wb, ws, '📅 Month-over-Month');
+    XLSX.utils.book_append_sheet(wb, ws, 'Month-over-Month');
   }
 
   // ── 6. Flags ─────────────────────────────────────────────────────────────────
@@ -484,7 +484,7 @@ export function exportExcel(fileName: string, analysis: LedgerAnalysis, pl: Prof
 
     ws['!cols'] = [colWidth(28), colWidth(30), colWidth(40), colWidth(14)];
     ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 3 } }];
-    XLSX.utils.book_append_sheet(wb, ws, '🚩 Flags');
+    XLSX.utils.book_append_sheet(wb, ws, 'Flags');
   }
 
   XLSX.writeFile(wb, `${baseName(fileName)}_analysis.xlsx`);

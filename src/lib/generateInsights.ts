@@ -1,6 +1,7 @@
 import type { LedgerRow } from '../../app/upload/upload-utils';
 import { isAnyExpense, isCogsType, isCurrentAsset, isCurrentLiability, isExpenseType, isRevenueType, parseCurrencyAmount, roundCurrency } from './accounting';
 import { extractMonthKey } from './generatePL';
+import { verifyCategoriesFree, type CategoryVerification } from './verifyCategoryFree';
 
 export type VendorSpend = { name: string; total: number; txCount: number; accounts: string[] };
 export type RevenueSource = { name: string; total: number; txCount: number };
@@ -30,6 +31,7 @@ export type FinancialInsights = {
   // Monthly trends
   monthlyBurn: Record<string, number>;
   monthlyCashPosition: Record<string, number>;
+  categoryMismatches: CategoryVerification[];
 };
 
 export function generateInsights(rows: LedgerRow[]): FinancialInsights {
@@ -165,5 +167,5 @@ export function generateInsights(rows: LedgerRow[]): FinancialInsights {
   const taxRate = 0.21;
   const taxEstimate = { rate: taxRate, amount: roundCurrency(Math.max(0, netProfit * taxRate)), basis: `${(taxRate * 100).toFixed(0)}% flat rate on estimated net profit of $${netProfit.toFixed(2)}` };
 
-  return { avgMonthlyBurn, avgMonthlyRevenue, cashBalance, runwayMonths, topVendors, topRevenueSources, anomalies, auditFlags, taxEstimate, monthlyBurn, monthlyCashPosition };
+  return { avgMonthlyBurn, avgMonthlyRevenue, cashBalance, runwayMonths, topVendors, topRevenueSources, anomalies, auditFlags, taxEstimate, monthlyBurn, monthlyCashPosition, categoryMismatches: verifyCategoriesFree(rows) };
 }

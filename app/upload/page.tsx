@@ -475,19 +475,56 @@ export default function UploadPage() {
               <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 {(() => {
                   const { currentRatio, quickRatio, debtToEquity, debtRatio } = balanceSheet.ratios;
-                  const pct = (v: number) => `${(v * 100).toFixed(1)}%`;
-                  const ratio = (label: string, val: number | null, good: (v: number) => boolean, tip: string) => (
-                    <div className={`rounded-2xl p-4 ${val !== null && good(val) ? ui.successCard : val !== null ? ui.dangerPill : ui.card}`}>
-                      <p className="text-sm">{label}</p>
-                      <p className="mt-2 text-2xl font-semibold">{val !== null ? val.toFixed(2) : 'N/A'}</p>
-                      <p className="mt-1 text-xs opacity-70">{tip}</p>
-                    </div>
-                  );
+                  const RATIOS = [
+                    {
+                      label: 'Current Ratio',
+                      val: currentRatio,
+                      good: (v: number) => v >= 1.5,
+                      formula: 'Current Assets ÷ Current Liabilities',
+                      numerator: fmt.format(balanceSheet.totals.currentAssetsTotal),
+                      denominator: fmt.format(balanceSheet.totals.currentLiabilitiesTotal),
+                      benchmark: '≥ 1.5 is healthy',
+                    },
+                    {
+                      label: 'Quick Ratio',
+                      val: quickRatio,
+                      good: (v: number) => v >= 1.0,
+                      formula: '(Current Assets − Inventory) ÷ Current Liabilities',
+                      numerator: 'Liquid assets only',
+                      denominator: fmt.format(balanceSheet.totals.currentLiabilitiesTotal),
+                      benchmark: '≥ 1.0 is healthy',
+                    },
+                    {
+                      label: 'Debt-to-Equity',
+                      val: debtToEquity,
+                      good: (v: number) => v <= 2.0,
+                      formula: 'Total Liabilities ÷ Total Equity',
+                      numerator: fmt.format(balanceSheet.totals.liabilitiesTotal),
+                      denominator: fmt.format(balanceSheet.totals.equityTotal),
+                      benchmark: '≤ 2.0 is healthy',
+                    },
+                    {
+                      label: 'Debt Ratio',
+                      val: debtRatio,
+                      good: (v: number) => v <= 0.5,
+                      formula: 'Total Liabilities ÷ Total Assets',
+                      numerator: fmt.format(balanceSheet.totals.liabilitiesTotal),
+                      denominator: fmt.format(balanceSheet.totals.assetsTotal),
+                      benchmark: '≤ 50% is healthy',
+                    },
+                  ];
                   return <>
-                    {ratio('Current Ratio', currentRatio, v => v >= 1.5, 'Healthy ≥ 1.5 · Current Assets / Current Liabilities')}
-                    {ratio('Quick Ratio', quickRatio, v => v >= 1.0, 'Healthy ≥ 1.0 · Liquid Assets / Current Liabilities')}
-                    {ratio('Debt-to-Equity', debtToEquity, v => v <= 2.0, 'Healthy ≤ 2.0 · Total Debt / Equity')}
-                    {ratio('Debt Ratio', debtRatio, v => v <= 0.5, 'Healthy ≤ 50% · Total Debt / Total Assets')}
+                    {RATIOS.map(({ label, val, good, formula, numerator, denominator, benchmark }) => (
+                      <div key={label} className={`rounded-2xl p-4 ${val !== null && good(val) ? ui.successCard : val !== null ? ui.dangerPill : ui.card}`}>
+                        <p className="text-sm font-semibold">{label}</p>
+                        <p className="mt-2 text-2xl font-bold">{val !== null ? val.toFixed(2) : 'N/A'}</p>
+                        <div className={`mt-2 text-[10px] space-y-0.5 opacity-80`}>
+                          <p className="font-mono bg-black/10 rounded px-1.5 py-0.5">{formula}</p>
+                          <p>{numerator} ÷ {denominator}</p>
+                          <p className="font-semibold">{benchmark}</p>
+                        </div>
+                      </div>
+                    ))}
                   </>;
                 })()}
               </div>
@@ -591,6 +628,31 @@ export default function UploadPage() {
                 </div>
               )}
             </div>
+
+            {/* Category Mismatches */}
+            {insights.categoryMismatches.length > 0 && (
+              <div className={`rounded-3xl border p-6 ${ui.panel}`}>
+                <p className={`text-xs font-semibold uppercase tracking-widest ${ui.label}`}>AI Category Check</p>
+                <h2 className={`mt-0.5 text-xl font-bold ${ui.heading}`}>Possible Miscategorised Transactions</h2>
+                <p className={`mt-1 text-sm ${ui.muted}`}>Based on memo/description text — verify these manually.</p>
+                <div className="mt-4 space-y-2 max-h-72 overflow-y-auto">
+                  {insights.categoryMismatches.map((m, i) => (
+                    <div key={i} className={`rounded-xl px-4 py-3 text-sm ${ui.warningRow}`}>
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="font-semibold">{m.row['Distribution account']}</span>
+                        <div className="flex items-center gap-1.5 text-xs">
+                          <span className={`px-2 py-0.5 rounded-full font-semibold ${theme === 'dark' ? 'bg-rose-900/60 text-rose-300' : 'bg-rose-100 text-rose-700'}`}>{m.assignedType}</span>
+                          <span className={ui.muted}>→ suggests</span>
+                          <span className={`px-2 py-0.5 rounded-full font-semibold ${theme === 'dark' ? 'bg-emerald-900/60 text-emerald-300' : 'bg-emerald-100 text-emerald-700'}`}>{m.suggestedType}</span>
+                        </div>
+                      </div>
+                      <p className="text-xs mt-1 opacity-80">"{m.description.slice(0, 80)}{m.description.length > 80 ? '…' : ''}"</p>
+                      <p className={`text-xs mt-0.5 ${ui.muted}`}>{m.reason}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Tax estimate */}
             <div className={`rounded-3xl border p-6 ${ui.panel}`}>
