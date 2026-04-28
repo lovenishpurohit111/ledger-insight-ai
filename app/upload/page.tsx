@@ -88,8 +88,11 @@ export default function UploadPage() {
   const [view, setView] = useState<'upload' | 'dashboard'>('upload');
   const [activeTab, setActiveTab] = useState<Tab>('overview');
   const [showMoMPct, setShowMoMPct] = useState(false);
+  const [momFromMonth, setMomFromMonth] = useState<string>('');
+  const [momToMonth, setMomToMonth] = useState<string>('');
 
   const [previewRows, setPreviewRows] = useState<LedgerRow[]>([]);
+  const [allRows, setAllRows] = useState<LedgerRow[]>([]);
   const [analysis, setAnalysis] = useState<LedgerAnalysis | null>(null);
   const [profitAndLoss, setProfitAndLoss] = useState<ProfitAndLoss | null>(null);
   const [balanceSheet, setBalanceSheet] = useState<BalanceSheet | null>(null);
@@ -110,9 +113,10 @@ export default function UploadPage() {
 
   const clearState = () => {
     setUploadError(null); setHeaderErrors([]); setRowIssues([]);
-    setPreviewRows([]); setAnalysis(null); setProfitAndLoss(null);
+    setPreviewRows([]); setAllRows([]); setAnalysis(null); setProfitAndLoss(null);
     setBalanceSheet(null); setCashFlow(null); setMomPL(null); setInsights(null);
     setPendingFile(null); setFileHeaders([]); setShowMapper(false);
+    setMomFromMonth(''); setMomToMonth('');
   };
 
   const processRows = useCallback((rows: LedgerRow[], rowIssues: RowIssue[]) => {
@@ -124,6 +128,7 @@ export default function UploadPage() {
     setMomPL(generateMoMPL(rows));
     setInsights(generateInsights(rows));
     setPreviewRows(rows.slice(0, 100));
+    setAllRows(rows);
     setRowIssues(rowIssues);
     setView('dashboard');
     setActiveTab('overview');
@@ -340,7 +345,7 @@ export default function UploadPage() {
               <>
                 <button type="button" onClick={() => exportCsv(fileName, analysis, profitAndLoss, balanceSheet, cashFlow)}
                   className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white shadow transition-colors hover:bg-emerald-700">↓ CSV</button>
-                <button type="button" onClick={() => exportExcel(fileName, analysis, profitAndLoss, balanceSheet, cashFlow, momPL ?? undefined)}
+                <button type="button" onClick={() => exportExcel(fileName, analysis, profitAndLoss, balanceSheet, cashFlow, momPL ?? undefined, allRows)}
                   className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white shadow transition-colors hover:bg-blue-700">↓ Excel</button>
                 <button type="button" onClick={() => exportPdf(fileName, analysis, profitAndLoss, balanceSheet, cashFlow)}
                   className="rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white shadow transition-colors hover:bg-rose-700">↓ PDF</button>
@@ -797,20 +802,72 @@ export default function UploadPage() {
           </div>
         )}
 
-        {/* ── MONTH-OVER-MONTH TAB ── */}
-        {activeTab === 'mom' && momPL && (
+        {activeTab === 'mom' && momPL && (() => {
+          const filteredMonths = momPL.months.filter(m =>
+            (!momFromMonth || m >= momFromMonth) && (!momToMonth || m <= momToMonth)
+          );
+          const filteredIncome = momPL.incomeCategories.map(cat => ({
+            ...cat,
+            total: filteredMonths.reduce((t, m) => t + (cat.months[m] ?? 0), 0),
+          })).filter(cat => filteredMonths.some(m => (cat.months[m] ?? 0) !== 0));
+          const filteredExpense = momPL.expenseCategories.map(cat => ({
+            ...cat,
+            total: filteredMonths.reduce((t, m) => t + (cat.months[m] ?? 0), 0),
+          })).filter(cat => filteredMonths.some(m => (cat.months[m] ?? 0) !== 0));
+          const fMonthlyRevenue: Record<string,number> = {};
+          const fMonthlyExpenses: Record<string,number> = {};
+          const fMonthlyNet: Record<string,number> = {};
+          filteredMonths.forEach(m => {
+            fMonthlyRevenue[m] = momPL.monthlyRevenue[m] ?? 0;
+            fMonthlyExpenses[m] = momPL.monthlyExpenses[m] ?? 0;
+            fMonthlyNet[m] = momPL.monthlyNetProfit[m] ?? 0;
+          });
+          const fTotalRev = Object.values(fMonthlyRevenue).reduce((a,b)=>a+b,0);
+          const fTotalExp = Object.values(fMonthlyExpenses).reduce((a,b)=>a+b,0);
+          const fTotalNet = fTotalRev - fTotalExp;
+
+          return (
           <div className={`rounded-3xl border p-6 ${ui.panel}`}>
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <p className={`text-xs font-semibold uppercase tracking-widest ${ui.label}`}>Analytics</p>
                 <h2 className={`mt-0.5 text-xl font-bold ${ui.heading}`}>Month-over-Month P&amp;L</h2>
-                <p className={`mt-1 text-sm ${ui.muted}`}>Revenue and expenses by category across months.</p>
+                <p className={`mt-1 text-sm ${ui.muted}`}>
+                  {filteredMonths.length} month{filteredMonths.length !== 1 ? 's' : ''} shown
+                  {momFromMonth || momToMonth ? ` · filtered` : ` · all data`}
+                </p>
               </div>
-              <div className={`flex rounded-full p-1 text-xs font-semibold ${ui.settingsControl}`}>
-                <button type="button" onClick={() => setShowMoMPct(false)}
-                  className={`rounded-full px-3 py-1.5 transition-colors ${!showMoMPct ? ui.settingsOptionActive : ui.settingsOptionInactive}`}>$ Amount</button>
-                <button type="button" onClick={() => setShowMoMPct(true)}
-                  className={`rounded-full px-3 py-1.5 transition-colors ${showMoMPct ? ui.settingsOptionActive : ui.settingsOptionInactive}`}>% MoM</button>
+              <div className="flex flex-wrap items-center gap-3">
+                {/* Date range pickers */}
+                <div className="flex items-center gap-2">
+                  <div className="flex flex-col gap-0.5">
+                    <label className={`text-[10px] font-semibold uppercase ${ui.label}`}>From</label>
+                    <select value={momFromMonth} onChange={e => setMomFromMonth(e.target.value)}
+                      className={`text-xs rounded-lg px-2 py-1.5 border outline-none ${theme === 'dark' ? 'bg-slate-800 border-slate-600 text-slate-200' : 'bg-white border-slate-300 text-slate-700'}`}>
+                      <option value="">All</option>
+                      {momPL.months.map(m => <option key={m} value={m}>{monthLabel(m)}</option>)}
+                    </select>
+                  </div>
+                  <span className={`mt-4 ${ui.muted}`}>→</span>
+                  <div className="flex flex-col gap-0.5">
+                    <label className={`text-[10px] font-semibold uppercase ${ui.label}`}>To</label>
+                    <select value={momToMonth} onChange={e => setMomToMonth(e.target.value)}
+                      className={`text-xs rounded-lg px-2 py-1.5 border outline-none ${theme === 'dark' ? 'bg-slate-800 border-slate-600 text-slate-200' : 'bg-white border-slate-300 text-slate-700'}`}>
+                      <option value="">All</option>
+                      {momPL.months.map(m => <option key={m} value={m}>{monthLabel(m)}</option>)}
+                    </select>
+                  </div>
+                  {(momFromMonth || momToMonth) && (
+                    <button type="button" onClick={() => { setMomFromMonth(''); setMomToMonth(''); }}
+                      className="mt-4 text-xs text-cyan-400 hover:text-cyan-300">✕ Reset</button>
+                  )}
+                </div>
+                <div className={`flex rounded-full p-1 text-xs font-semibold ${ui.settingsControl}`}>
+                  <button type="button" onClick={() => setShowMoMPct(false)}
+                    className={`rounded-full px-3 py-1.5 transition-colors ${!showMoMPct ? ui.settingsOptionActive : ui.settingsOptionInactive}`}>$ Amount</button>
+                  <button type="button" onClick={() => setShowMoMPct(true)}
+                    className={`rounded-full px-3 py-1.5 transition-colors ${showMoMPct ? ui.settingsOptionActive : ui.settingsOptionInactive}`}>% MoM</button>
+                </div>
               </div>
             </div>
 
@@ -819,120 +876,93 @@ export default function UploadPage() {
                 <thead className="sticky top-0 z-20">
                   <tr>
                     <th className={`sticky left-0 z-30 rounded-tl-xl px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider ${ui.tableHead}`}>Account</th>
-                    {momPL.months.map((m) => (
+                    {filteredMonths.map((m) => (
                       <th key={m} className={`px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider ${ui.tableHead}`}>{monthLabel(m)}</th>
                     ))}
                     <th className={`rounded-tr-xl px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider ${ui.tableHead}`}>Total</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {/* Income section */}
-                  <tr>
-                    <td colSpan={momPL.months.length + 2} className={`px-4 py-2 text-xs font-bold uppercase tracking-widest ${ui.muted} ${ui.card}`}>
-                      ▸ Income
-                    </td>
-                  </tr>
-                  {momPL.incomeCategories.map((cat, rowIdx) => (
+                  <tr><td colSpan={filteredMonths.length + 2} className={`px-4 py-2 text-xs font-bold uppercase tracking-widest ${ui.muted} ${ui.card}`}>▸ Income</td></tr>
+                  {filteredIncome.map((cat, rowIdx) => (
                     <tr key={cat.name}>
                       <td className={`sticky left-0 z-10 px-4 py-2.5 font-medium ${rowIdx % 2 === 0 ? ui.tableRow : ui.tableAlt}`}>{cat.name}</td>
-                      {momPL.months.map((m, mIdx) => {
+                      {filteredMonths.map((m, mIdx) => {
                         const val = cat.months[m] ?? 0;
-                        const prev = mIdx > 0 ? (cat.months[momPL.months[mIdx - 1]] ?? 0) : null;
+                        const prev = mIdx > 0 ? (cat.months[filteredMonths[mIdx - 1]] ?? 0) : null;
                         const pct = showMoMPct && prev !== null ? momChange(val, prev) : null;
                         return (
                           <td key={m} className={`px-4 py-2.5 text-right ${rowIdx % 2 === 0 ? ui.tableRow : ui.tableAlt}`}>
-                            {showMoMPct && mIdx > 0 ? (
-                              pct === null ? <span className={ui.muted}>—</span>
-                                : <span className={pct >= 0 ? 'text-emerald-400' : 'text-rose-400'}>{pct >= 0 ? '+' : ''}{pct.toFixed(1)}%</span>
-                            ) : val > 0 ? fmt.format(val) : <span className={ui.muted}>—</span>}
+                            {showMoMPct && mIdx > 0
+                              ? pct === null ? <span className={ui.muted}>—</span> : <span className={pct >= 0 ? 'text-emerald-400' : 'text-rose-400'}>{pct >= 0 ? '+' : ''}{pct.toFixed(1)}%</span>
+                              : val > 0 ? fmt.format(val) : <span className={ui.muted}>—</span>}
                           </td>
                         );
                       })}
                       <td className={`px-4 py-2.5 text-right font-semibold ${rowIdx % 2 === 0 ? ui.tableRow : ui.tableAlt}`}>{fmt.format(cat.total)}</td>
                     </tr>
                   ))}
-                  {/* Total Revenue row */}
                   <tr>
                     <td className={`sticky left-0 z-10 px-4 py-2.5 font-bold ${ui.tableHead}`}>Total Revenue</td>
-                    {momPL.months.map((m, mIdx) => {
-                      const val = momPL.monthlyRevenue[m] ?? 0;
-                      const prev = mIdx > 0 ? (momPL.monthlyRevenue[momPL.months[mIdx-1]] ?? 0) : null;
+                    {filteredMonths.map((m, mIdx) => {
+                      const val = fMonthlyRevenue[m] ?? 0;
+                      const prev = mIdx > 0 ? (fMonthlyRevenue[filteredMonths[mIdx-1]] ?? 0) : null;
                       const pct = showMoMPct && prev !== null ? momChange(val, prev) : null;
-                      return (
-                        <td key={m} className={`px-4 py-2.5 text-right font-bold ${ui.tableHead}`}>
-                          {showMoMPct && mIdx > 0 ? (pct === null ? '—' : `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%`) : fmt.format(val)}
-                        </td>
-                      );
+                      return <td key={m} className={`px-4 py-2.5 text-right font-bold ${ui.tableHead}`}>{showMoMPct && mIdx > 0 ? (pct === null ? '—' : `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%`) : fmt.format(val)}</td>;
                     })}
-                    <td className={`px-4 py-2.5 text-right font-bold ${ui.tableHead}`}>{fmt.format(momPL.totalRevenue)}</td>
+                    <td className={`px-4 py-2.5 text-right font-bold ${ui.tableHead}`}>{fmt.format(fTotalRev)}</td>
                   </tr>
 
-                  {/* Spacer */}
-                  <tr><td colSpan={momPL.months.length + 2} className="py-2" /></tr>
+                  <tr><td colSpan={filteredMonths.length + 2} className="py-2" /></tr>
 
-                  {/* Expense section */}
-                  <tr>
-                    <td colSpan={momPL.months.length + 2} className={`px-4 py-2 text-xs font-bold uppercase tracking-widest ${ui.muted} ${ui.card}`}>
-                      ▸ Expenses
-                    </td>
-                  </tr>
-                  {momPL.expenseCategories.map((cat, rowIdx) => (
+                  <tr><td colSpan={filteredMonths.length + 2} className={`px-4 py-2 text-xs font-bold uppercase tracking-widest ${ui.muted} ${ui.card}`}>▸ Expenses</td></tr>
+                  {filteredExpense.map((cat, rowIdx) => (
                     <tr key={cat.name}>
                       <td className={`sticky left-0 z-10 px-4 py-2.5 font-medium ${rowIdx % 2 === 0 ? ui.tableRow : ui.tableAlt}`}>{cat.name}</td>
-                      {momPL.months.map((m, mIdx) => {
+                      {filteredMonths.map((m, mIdx) => {
                         const val = cat.months[m] ?? 0;
-                        const prev = mIdx > 0 ? (cat.months[momPL.months[mIdx - 1]] ?? 0) : null;
+                        const prev = mIdx > 0 ? (cat.months[filteredMonths[mIdx - 1]] ?? 0) : null;
                         const pct = showMoMPct && prev !== null ? momChange(val, prev) : null;
                         return (
                           <td key={m} className={`px-4 py-2.5 text-right ${rowIdx % 2 === 0 ? ui.tableRow : ui.tableAlt}`}>
-                            {showMoMPct && mIdx > 0 ? (
-                              pct === null ? <span className={ui.muted}>—</span>
-                                : <span className={pct >= 0 ? 'text-rose-400' : 'text-emerald-400'}>{pct >= 0 ? '+' : ''}{pct.toFixed(1)}%</span>
-                            ) : val > 0 ? fmt.format(val) : <span className={ui.muted}>—</span>}
+                            {showMoMPct && mIdx > 0
+                              ? pct === null ? <span className={ui.muted}>—</span> : <span className={pct >= 0 ? 'text-rose-400' : 'text-emerald-400'}>{pct >= 0 ? '+' : ''}{pct.toFixed(1)}%</span>
+                              : val > 0 ? fmt.format(val) : <span className={ui.muted}>—</span>}
                           </td>
                         );
                       })}
                       <td className={`px-4 py-2.5 text-right font-semibold ${rowIdx % 2 === 0 ? ui.tableRow : ui.tableAlt}`}>{fmt.format(cat.total)}</td>
                     </tr>
                   ))}
-                  {/* Total Expenses row */}
                   <tr>
                     <td className={`sticky left-0 z-10 px-4 py-2.5 font-bold ${ui.tableHead}`}>Total Expenses</td>
-                    {momPL.months.map((m, mIdx) => {
-                      const val = momPL.monthlyExpenses[m] ?? 0;
-                      const prev = mIdx > 0 ? (momPL.monthlyExpenses[momPL.months[mIdx-1]] ?? 0) : null;
+                    {filteredMonths.map((m, mIdx) => {
+                      const val = fMonthlyExpenses[m] ?? 0;
+                      const prev = mIdx > 0 ? (fMonthlyExpenses[filteredMonths[mIdx-1]] ?? 0) : null;
                       const pct = showMoMPct && prev !== null ? momChange(val, prev) : null;
-                      return (
-                        <td key={m} className={`px-4 py-2.5 text-right font-bold ${ui.tableHead}`}>
-                          {showMoMPct && mIdx > 0 ? (pct === null ? '—' : `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%`) : fmt.format(val)}
-                        </td>
-                      );
+                      return <td key={m} className={`px-4 py-2.5 text-right font-bold ${ui.tableHead}`}>{showMoMPct && mIdx > 0 ? (pct === null ? '—' : `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%`) : fmt.format(val)}</td>;
                     })}
-                    <td className={`px-4 py-2.5 text-right font-bold ${ui.tableHead}`}>{fmt.format(momPL.totalExpenses)}</td>
+                    <td className={`px-4 py-2.5 text-right font-bold ${ui.tableHead}`}>{fmt.format(fTotalExp)}</td>
                   </tr>
 
-                  {/* Net Profit row */}
                   <tr>
                     <td className={`sticky left-0 z-10 px-4 py-3 font-bold ${ui.successCard} rounded-bl-xl`}>Net Profit</td>
-                    {momPL.months.map((m, mIdx) => {
-                      const val = momPL.monthlyNetProfit[m] ?? 0;
-                      const prev = mIdx > 0 ? (momPL.monthlyNetProfit[momPL.months[mIdx-1]] ?? 0) : null;
+                    {filteredMonths.map((m, mIdx) => {
+                      const val = fMonthlyNet[m] ?? 0;
+                      const prev = mIdx > 0 ? (fMonthlyNet[filteredMonths[mIdx-1]] ?? 0) : null;
                       const pct = showMoMPct && prev !== null ? momChange(val, prev) : null;
-                      return (
-                        <td key={m} className={`px-4 py-3 text-right font-bold ${val >= 0 ? ui.successCard : ui.dangerPill}`}>
-                          {showMoMPct && mIdx > 0
-                            ? (pct === null ? '—' : `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%`)
-                            : fmt.format(val)}
-                        </td>
-                      );
+                      return <td key={m} className={`px-4 py-3 text-right font-bold ${val >= 0 ? ui.successCard : ui.dangerPill}`}>
+                        {showMoMPct && mIdx > 0 ? (pct === null ? '—' : `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%`) : fmt.format(val)}
+                      </td>;
                     })}
-                    <td className={`px-4 py-3 text-right font-bold rounded-br-xl ${momPL.totalNetProfit >= 0 ? ui.successCard : ui.dangerPill}`}>{fmt.format(momPL.totalNetProfit)}</td>
+                    <td className={`px-4 py-3 text-right font-bold rounded-br-xl ${fTotalNet >= 0 ? ui.successCard : ui.dangerPill}`}>{fmt.format(fTotalNet)}</td>
                   </tr>
                 </tbody>
               </table>
             </div>
           </div>
-        )}
+          );
+        })()}
 
         {/* ── TRANSACTIONS TAB ── */}
         {activeTab === 'preview' && previewRows.length > 0 && (
