@@ -43,7 +43,7 @@ const L = (n:number) => n < 26 ? String.fromCharCode(65+n) : String.fromCharCode
 const MG = (r:number,c:number,r2:number,c2:number) => ({s:{r,c},e:{r:r2,c:c2}});
 
 // Formula cell helper — value is fallback, formula drives live linking
-const fc = (f:string, v:number, style:CS):CS => ({t:'f', f, v, s:style});
+const fc = (f:string, v:number, style:CS):CS => ({t:'n', f, v, s:style});
 const vc = (v:string|number, t:string, style:CS):CS => ({v, t, s:style});
 
 // Raw Ledger column positions (1-indexed for Excel)

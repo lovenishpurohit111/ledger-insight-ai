@@ -210,6 +210,7 @@ export default function UploadPage() {
       setMomPL(generateMoMPL(result.rows));
       setInsights(generateInsights(result.rows));
       setPreviewRows(result.rows.slice(0, 100));
+      setAllRows(result.rows);
       setView('dashboard');
       setActiveTab('overview');
     } catch (e) {
