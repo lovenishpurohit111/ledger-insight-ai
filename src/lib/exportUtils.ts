@@ -49,33 +49,36 @@ const vc = (v:string|number, t:string, style:CS):CS => ({v, t, s:style});
 // Raw Ledger column positions (1-indexed for Excel)
 const RL = 'Raw Ledger';
 const COL = { acct:'A', type:'B', date:'C', txType:'D', num:'E', name:'F', desc:'G', split:'H', amount:'I', balance:'J' };
-const MAX_ROW = 1000000; // Excel handles this fine with SUMIF
 
-// QBO account type buckets — used in SUMIF criteria arrays
-const INC_TYPES  = '"Income","income","Revenue","revenue","Sales","sales","Other Income","other income","Other Revenue"';
-const COGS_TYPES = '"Cost of Goods Sold","cost of goods sold","COGS","cogs","Cost of Sales"';
-const EXP_TYPES  = '"Expense","expense","Expenses","expenses","Other Expense","other expense","Other Expenses"';
-const ASSET_TYPES= '"Asset","asset","Assets","Bank","bank","Accounts Receivable (A/R)","Other Current Assets","Other Current Asset","Fixed Assets","Fixed Asset","Other Assets","Inventory"';
-const LIAB_TYPES = '"Liability","liability","Liabilities","Accounts Payable (A/P)","Credit Card","Other Current Liabilities","Other Current Liability","Long Term Liabilities","Long Term Liability"';
-const EQUITY_TYPES='"Equity","equity","Retained Earnings","Opening Balance Equity"';
+// Actual data range — set after rawRows length is known, default 5000
+let DATA_END = 5000;
 
-// SUMIF across multiple type criteria — sum all matching types
-const sumTypes = (types: string, amtOrBal: string, extraCriteria = '') => {
-  const arr = types.split(',').map(t => t.trim());
-  return arr.map(t => `SUMIF('${RL}'!${COL.type}:${COL.type},${t},'${RL}'!${amtOrBal}:${amtOrBal})`).join('+');
+// QBO account type groups — each is an array of exact strings
+const INC_LIST  = ['Income','income','Revenue','revenue','Sales','sales','Other Income','other income','Non-operating Income'];
+const COGS_LIST = ['Cost of Goods Sold','cost of goods sold','COGS','cogs','Cost of Sales'];
+const EXP_LIST  = ['Expense','expense','Expenses','expenses','Other Expense','other expense','Non-operating Expense'];
+const ASSET_LIST= ['Asset','asset','Bank','bank','Accounts Receivable (A/R)','Other Current Assets','Other Current Asset','Fixed Assets','Fixed Asset','Other Assets','Inventory'];
+const LIAB_LIST = ['Liability','liability','Liabilities','Accounts Payable (A/P)','Credit Card','Other Current Liabilities','Other Current Liability','Long Term Liabilities','Long Term Liability'];
+const EQ_LIST   = ['Equity','equity','Retained Earnings','Opening Balance Equity'];
+
+// SUMIF chain — one SUMIF per type value, summed together
+// This avoids the array-formula #VALUE issue entirely
+const sumTypes = (list: string[], col: 'I'|'J') =>
+  list.map(t => `SUMIF('${RL}'!B$2:B$${DATA_END},"${t}",'${RL}'!${col}$2:${col}$${DATA_END})`).join('+');
+
+// SUMPRODUCT for type + month — uses bounded range, no MATCH needed
+const sumMonth = (list: string[], monthKey: string) => {
+  const typeMatch = list.map(t => `('${RL}'!B$2:B$${DATA_END}="${t}")`).join('+');
+  return `SUMPRODUCT(((${typeMatch})>0)*(TEXT('${RL}'!C$2:C$${DATA_END},"YYYY-MM")="${monthKey}")*('${RL}'!I$2:I$${DATA_END}))`;
 };
 
-// SUMPRODUCT for filtered sum (type + month)
-const sumMonth = (typeArr: string, monthKey: string, amtCol: string) =>
-  `SUMPRODUCT((ISNUMBER(MATCH('${RL}'!${COL.type}$2:${COL.type}$${MAX_ROW},{${typeArr}},0)))*(TEXT('${RL}'!${COL.date}$2:${COL.date}$${MAX_ROW},"YYYY-MM")="${monthKey}")*('${RL}'!${amtCol}$2:${amtCol}$${MAX_ROW}))`;
-
-// SUMPRODUCT for account + month
+// SUMPRODUCT for specific account + month
 const sumAcctMonth = (acctName: string, monthKey: string) =>
-  `SUMPRODUCT(('${RL}'!${COL.acct}$2:${COL.acct}$${MAX_ROW}="${acctName}")*(TEXT('${RL}'!${COL.date}$2:${COL.date}$${MAX_ROW},"YYYY-MM")="${monthKey}")*('${RL}'!${COL.amount}$2:${COL.amount}$${MAX_ROW}))`;
+  `SUMPRODUCT(('${RL}'!A$2:A$${DATA_END}="${acctName.replace(/"/g,'""')}")*(TEXT('${RL}'!C$2:C$${DATA_END},"YYYY-MM")="${monthKey}")*('${RL}'!I$2:I$${DATA_END}))`;
 
-// Last balance for account (LOOKUP trick)
-const lastBalance = (acctRef: string) =>
-  `IFERROR(LOOKUP(2,1/('${RL}'!${COL.acct}$2:${COL.acct}$${MAX_ROW}=${acctRef}),'${RL}'!${COL.balance}$2:${COL.balance}$${MAX_ROW}),0)`;
+// Last balance per account — LOOKUP down column for last matching row
+const lastBalance = (acctName: string) =>
+  `IFERROR(LOOKUP(2,1/('${RL}'!A$2:A$${DATA_END}="${acctName.replace(/"/g,'""')}"),'${RL}'!J$2:J$${DATA_END}),0)`;
 
 // ── CSV export ────────────────────────────────────────────────────────────────
 export function exportCsv(fileName: string, analysis: LedgerAnalysis, pl: ProfitAndLoss, bs: BalanceSheet, cf: CashFlowStatement): void {
@@ -104,14 +107,18 @@ export function exportExcel(
   const co = base(fileName);
   const HEADERS = ['Distribution account','Distribution account type','Transaction date','Transaction type','Num','Name','Description','Split','Amount','Balance'];
 
+  // Set bounded range based on actual data
+  DATA_END = rawRows && rawRows.length > 0 ? rawRows.length + 1 : 5000;
+
   // ══ SHEET 1: Raw Ledger ═══════════════════════════════════════════════════
-  if (rawRows && rawRows.length > 0) {
-    const aoa = [HEADERS, ...rawRows.map(r => HEADERS.map(h => r[h as keyof typeof r] ?? ''))];
+  {
+    const rows = rawRows && rawRows.length > 0 ? rawRows : [];
+    const aoa = [HEADERS, ...rows.map(r => HEADERS.map(h => r[h as keyof typeof r] ?? ''))];
     const ws = XLSX.utils.aoa_to_sheet(aoa);
 
-    HEADERS.forEach((_,i) => { ws[`${L(i)}1`].s = ss.hdr(C.NAVY,C.WHITE,10); });
+    HEADERS.forEach((_,i) => { if(ws[`${L(i)}1`]) ws[`${L(i)}1`].s = ss.hdr(C.NAVY,C.WHITE,10); });
 
-    rawRows.forEach((_, ri) => {
+    rows.forEach((_, ri) => {
       const rn = ri+2; const bg = ri%2===0 ? C.WHITE : C.OFF;
       HEADERS.forEach((_,ci) => {
         const addr=`${L(ci)}${rn}`; if(!ws[addr]) ws[addr]={t:'s',v:''};
@@ -121,7 +128,7 @@ export function exportExcel(
 
     ws['!cols']=[W(28),W(22),W(14),W(14),W(8),W(18),W(32),W(18),W(14),W(14)];
     ws['!freeze']={xSplit:0,ySplit:1};
-    ws['!autofilter']={ref:`A1:J1`};
+    if(rows.length > 0) ws['!autofilter']={ref:`A1:J1`};
     XLSX.utils.book_append_sheet(wb, ws, RL);
   }
 
@@ -147,7 +154,7 @@ export function exportExcel(
     put(6,2,vc('','s',{fill:{fgColor:{rgb:C.NAVY2},patternType:'solid'}}));
 
     put(7,0,vc('  Total Revenue','s',ss.cell(false,C.BLACK,'left',C.GRN_LT)));
-    put(7,1,fc(`${sumTypes(INC_TYPES,COL.amount)}`, pl.totalRevenue, ss.money(true,C.GREEN2,C.GRN_LT)));
+    put(7,1,fc(`${sumTypes(INC_LIST,'I')}`, pl.totalRevenue, ss.money(true,C.GREEN2,C.GRN_LT)));
     put(7,2,fc(`IF(B7=0,0,B7/B7)`, 1, ss.pct(false,C.BLACK,C.GRN_LT)));
 
     // COGS
@@ -156,7 +163,7 @@ export function exportExcel(
     put(9,2,vc('','s',{fill:{fgColor:{rgb:C.TEAL},patternType:'solid'}}));
 
     put(10,0,vc('  Total COGS','s',ss.cell()));
-    put(10,1,fc(`${sumTypes(COGS_TYPES,COL.amount)}`, pl.totalCogs, ss.money()));
+    put(10,1,fc(`${sumTypes(COGS_LIST,'I')}`, pl.totalCogs, ss.money()));
     put(10,2,fc(`IF(B7=0,0,B10/B7)`, pl.totalRevenue ? pl.totalCogs/pl.totalRevenue : 0, ss.pct()));
 
     put(11,0,vc('GROSS PROFIT','s',ss.totalLbl(C.GREEN)));
@@ -169,7 +176,7 @@ export function exportExcel(
     put(13,2,vc('','s',{fill:{fgColor:{rgb:C.TEAL},patternType:'solid'}}));
 
     put(14,0,vc('  Total Operating Expenses','s',ss.cell()));
-    put(14,1,fc(`${sumTypes(EXP_TYPES,COL.amount)}`, pl.totalExpenses, ss.money()));
+    put(14,1,fc(`${sumTypes(EXP_LIST,'I')}`, pl.totalExpenses, ss.money()));
     put(14,2,fc(`IF(B7=0,0,B14/B7)`, pl.totalRevenue ? pl.totalExpenses/pl.totalRevenue : 0, ss.pct()));
 
     const npColor = pl.netProfit >= 0 ? C.GREEN : C.RED;
@@ -189,9 +196,9 @@ export function exportExcel(
       const r = 19+i; const bg = i%2===0?C.WHITE:C.OFF;
       const net = revenue-(cogs??0)-expenses;
       put(r,0,vc(mk,'s',ss.cell(false,C.BLACK,'left',bg)));
-      put(r,1,fc(sumMonth(INC_TYPES,mk,COL.amount), revenue, ss.money(false,C.BLACK,bg)));
-      put(r,2,fc(sumMonth(COGS_TYPES,mk,COL.amount), cogs??0, ss.money(false,C.BLACK,bg)));
-      put(r,3,fc(sumMonth(EXP_TYPES,mk,COL.amount), expenses, ss.money(false,C.BLACK,bg)));
+      put(r,1,fc(sumMonth(INC_LIST,mk), revenue, ss.money(false,C.BLACK,bg)));
+      put(r,2,fc(sumMonth(COGS_LIST,mk), cogs??0, ss.money(false,C.BLACK,bg)));
+      put(r,3,fc(sumMonth(EXP_LIST,mk), expenses, ss.money(false,C.BLACK,bg)));
       put(r,4,fc(`${L(1)}${r}-${L(2)}${r}-${L(3)}${r}`, net, ss.money(false,net>=0?C.GREEN:C.RED,bg)));
       put(r,5,fc(`IF(${L(1)}${r}=0,0,${L(4)}${r}/${L(1)}${r})`, revenue?net/revenue:0, ss.pct(false,net>=0?C.GREEN:C.RED,bg)));
     });
@@ -225,7 +232,7 @@ export function exportExcel(
 
     const writeSection = (
       title: string, entries: BalanceSheet['assets'],
-      sumFormula: string, fallbackTotal: number, bg: string
+      fallbackTotal: number, bg: string
     ) => {
       put(r,0,vc(title,'s',ss.secHdr(bg)));
       put(r,1,vc('Balance','s',ss.hdr(bg)));
@@ -236,7 +243,7 @@ export function exportExcel(
       entries.forEach((e,i) => {
         const rowBg = i%2===0?C.WHITE:C.OFF;
         put(r,0,vc(`  ${e.account}`,'s',ss.cell(false,C.BLACK,'left',rowBg)));
-        put(r,1,fc(lastBalance(`A${r}`), e.value, ss.money(false,C.BLACK,rowBg)));
+        put(r,1,fc(lastBalance(e.account), e.value, ss.money(false,C.BLACK,rowBg)));
         put(r,2,fc(`IF(SUM(B${startR}:B${startR+entries.length})=0,0,B${r}/SUM(B${startR}:B${startR+entries.length-1}))`, fallbackTotal?e.value/fallbackTotal:0, ss.pct(false,C.BLACK,rowBg)));
         r++;
       });
@@ -247,9 +254,9 @@ export function exportExcel(
       r+=2;
     };
 
-    writeSection('ASSETS',  bs.assets,  sumTypes(ASSET_TYPES,COL.balance),  bs.totals.assetsTotal,      C.NAVY2);
-    writeSection('LIABILITIES', bs.liabilities, sumTypes(LIAB_TYPES,COL.balance), bs.totals.liabilitiesTotal, C.TEAL);
-    writeSection('EQUITY',  bs.equity,  sumTypes(EQUITY_TYPES,COL.balance), bs.totals.equityTotal,      C.GREEN);
+    writeSection('ASSETS',  bs.assets,  bs.totals.assetsTotal,      C.NAVY2);
+    writeSection('LIABILITIES', bs.liabilities, bs.totals.liabilitiesTotal, C.TEAL);
+    writeSection('EQUITY',  bs.equity,  bs.totals.equityTotal,      C.GREEN);
 
     // Reconciliation — formulas reference Total rows above
     put(r,0,vc('BALANCE SHEET CHECK','s',ss.secHdr(C.GOLD)));
