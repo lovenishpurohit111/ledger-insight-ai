@@ -140,7 +140,7 @@ export function exportCsv(fileName: string, analysis: LedgerAnalysis, pl: Profit
   const e = (v: string | number) => { const s = String(v); return s.includes(',') ? `"${s}"` : s; };
   const sec = (t: string, h: string[], rows: (string | number)[][]) =>
     [t, h.map(e).join(','), ...rows.map(r => r.map(e).join(',')), ''].join('\n');
-  const blob = new Blob([
+  const parts = [
     sec('P&L', ['Item','Amount','Margin'],[
       ['Revenue',$f(pl.totalRevenue),'100%'],
       ['COGS',$f(pl.totalCogs),pctStr(pl.totalRevenue?pl.totalCogs/pl.totalRevenue:0)],
@@ -154,7 +154,8 @@ export function exportCsv(fileName: string, analysis: LedgerAnalysis, pl: Profit
       ...bs.liabilities.map(({account,value})=>['Liability',account,$f(value)]),
       ...bs.equity.map(({account,value})=>['Equity',account,$f(value)]),
     ]),
-  ].join('\n'), { type: 'text/csv' });
+  ];
+  const blob = new Blob([parts.join('\n')], { type: 'text/csv' });
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `${base(fileName)}.csv`; a.click();
 }
 
