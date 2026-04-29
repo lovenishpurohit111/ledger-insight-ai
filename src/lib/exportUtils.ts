@@ -191,12 +191,11 @@ export function exportExcel(
 
     // ── KPI CARDS (rows 5-8, groups of 2 cols each) ──
     const kpis = [
-      { label:'Total Revenue',   val: pl.totalRevenue,   fmt: FMT_MONEY0, fg: C.GRN_HDR, isMoney:true },
-      { label:'Gross Profit',    val: pl.grossProfit,    fmt: FMT_MONEY0, fg: C.GREEN2,  isMoney:true },
-      { label:'Net Profit',      val: pl.netProfit,      fmt: FMT_MONEY0, fg: pl.netProfit>=0?C.GRN_HDR:C.RED, isMoney:true },
-      { label:'Gross Margin',    val: pl.grossMargin,    fmt: FMT_PCT,    fg: C.NAVY2,   isMoney:false },
-      { label:'Net Margin',      val: pl.netMargin,      fmt: FMT_PCT,    fg: C.NAVY2,   isMoney:false },
-      { label:'Total Assets',    val: bs.totals.assetsTotal, fmt: FMT_MONEY0, fg: C.TEAL, isMoney:true },
+      { label:'Total Revenue',   val: pl.totalRevenue,   fmt: FMT_MONEY0, fg: C.GRN_HDR, },
+      { label:'Gross Profit',    val: pl.grossProfit,    fmt: FMT_MONEY0, fg: C.GREEN2,  },
+      { label:'Net Profit',      val: pl.netProfit,      fmt: FMT_MONEY0, fg: pl.netProfit>=0?C.GRN_HDR:C.RED, },
+      { label:'Gross Margin',    val: pl.grossMargin,    fmt: FMT_PCT,    fg: C.NAVY2,   },
+      { label:'Net Margin',      val: pl.netMargin,      fmt: FMT_PCT,    fg: C.NAVY2,   },
     ];
 
     kpis.forEach((kpi, i) => {
@@ -307,14 +306,17 @@ export function exportExcel(
     ws['!cols'] = [W(22),W(16),W(12),W(36),W(22),W(16),W(12),W(12),W(12),W(12),W(22),W(12)];
     ws['!rows'] = [{ hpt:36 },{hpt:20},{hpt:8},{},{hpt:20},{hpt:44},{hpt:8},{},{hpt:24}];
     ws['!merges'] = [
-      MG(0,0,0,11), MG(1,0,1,3), MG(1,4,1,7), MG(1,8,1,11),
-      MG(2,0,2,11),
-      // KPI card merges (label row 5, value row 6)
-      ...Array.from({length:6},(_,i)=>MG(4,i*2,4,i*2+1)),
-      ...Array.from({length:6},(_,i)=>MG(5,i*2,5,i*2+1)),
-      // P&L section
+      MG(0,0,0,11), // title banner
+      MG(1,0,1,3), MG(1,4,1,7), MG(1,8,1,11), // subtitle cells
+      MG(2,0,2,11), // separator
+      // KPI cards rows 5-6 (5 cards × 2 cols = cols 0-9, BS status at cols 10-11)
+      ...Array.from({length:5},(_,i)=>MG(4,i*2,4,i*2+1)),
+      ...Array.from({length:5},(_,i)=>MG(5,i*2,5,i*2+1)),
+      MG(4,10,4,11), // BS status label
+      MG(5,10,5,11), // BS status value
+      // P&L section header (no overlapping merges)
       MG(9,0,9,3), MG(9,4,9,11),
-      MG(9,5,9,11),
+      // Monthly section header
       MG(19,0,19,3), MG(19,4,19,7),
       // Flag pills
       MG(27,0,27,1), MG(27,2,27,3), MG(27,4,27,5), MG(27,6,27,7),
@@ -449,7 +451,14 @@ export function exportExcel(
     ws['!ref']=`A1:F${totR}`;
     ws['!cols']=[W(32),W(18),W(14),W(16),W(16),W(12)];
     ws['!rows']=[{hpt:36},{hpt:20},{hpt:16}];
-    ws['!merges']=[MG(0,0,0,5),MG(1,0,1,5),MG(2,0,2,5),MG(5,0,5,3),MG(6,0,6,3),MG(8,0,8,3),MG(10,0,10,3),MG(11,0,11,3),MG(15,0,15,5)];
+    ws['!merges']=[
+      MG(0,0,0,5),MG(1,0,1,5),MG(2,0,2,5), // title banner
+      MG(5,0,5,3),   // summary header row
+      MG(6,0,6,3),   // REVENUE section header
+      MG(8,0,8,3),   // COGS section header
+      MG(11,0,11,3), // EXPENSES section header
+      MG(15,0,15,5), // monthly section header
+    ];
     ws['!freeze']={xSplit:0,ySplit:5};
     XLSX.utils.book_append_sheet(wb, ws, 'P & L');
   }
