@@ -119,15 +119,16 @@ const TEQ   = ['Equity','equity','Retained Earnings','Opening Balance Equity'];
 const SUMIF_chain = (types: string[], col: 'I' | 'J') =>
   `IFERROR(${types.map(t => `SUMIF('${RL}'!B$2:B$${DEND},"${t}",'${RL}'!${col}$2:${col}$${DEND})`).join('+')},0)`;
 
-// SUMPRODUCT for type group + month — IFERROR on TEXT prevents #VALUE on empty/text date cells
+// SUMPRODUCT for type group + month
+// Uses LEFT(date,7) instead of TEXT() — works on both text dates ("2024-01-01") and Excel date serials
 const SUMPRODUCT_month = (types: string[], mk: string) => {
   const typeFilter = types.map(t => `('${RL}'!B$2:B$${DEND}="${t}")`).join('+');
-  return `IFERROR(SUMPRODUCT(((${typeFilter})>0)*(IFERROR(TEXT('${RL}'!C$2:C$${DEND},"YYYY-MM"),"")="${mk}")*ISNUMBER('${RL}'!I$2:I$${DEND})*('${RL}'!I$2:I$${DEND})),0)`;
+  return `IFERROR(SUMPRODUCT(((${typeFilter})>0)*(LEFT('${RL}'!C$2:C$${DEND},7)="${mk}")*ISNUMBER('${RL}'!I$2:I$${DEND})*('${RL}'!I$2:I$${DEND})),0)`;
 };
 
 // SUMPRODUCT for specific account + month
 const SUMPRODUCT_acct = (acct: string, mk: string) =>
-  `IFERROR(SUMPRODUCT(('${RL}'!A$2:A$${DEND}="${acct.replace(/"/g, '""')}")*(IFERROR(TEXT('${RL}'!C$2:C$${DEND},"YYYY-MM"),"")="${mk}")*ISNUMBER('${RL}'!I$2:I$${DEND})*('${RL}'!I$2:I$${DEND})),0)`;
+  `IFERROR(SUMPRODUCT(('${RL}'!A$2:A$${DEND}="${acct.replace(/"/g, '""')}")*(LEFT('${RL}'!C$2:C$${DEND},7)="${mk}")*ISNUMBER('${RL}'!I$2:I$${DEND})*('${RL}'!I$2:I$${DEND})),0)`;
 
 // LOOKUP for last balance
 const LOOKUP_bal = (acct: string) =>
@@ -481,37 +482,38 @@ export function exportExcel(
     wv(ws,r,4,'Source Formula','s',ss.hdrC(C.NAVY2,C.WHITE,9));
     r++;
 
-    const writeBS = (title: string, entries: BalanceSheet['assets'], total: number, bg_c: string, typeLbl: string) => {
+    const writeBS = (title: string, entries: BalanceSheet['assets'], total: number, bg_c: string, typeLbl: string): number => {
       bg(ws,r,0,4,bg_c); wv(ws,r,0,`  ${title}`,'s',ss.secH(bg_c)); r++;
       const sr=r;
       entries.forEach((e,i)=>{
         const rb=i%2===0?C.WHITE:C.OFF;
         wv(ws,r,0,`  ${e.account}`,'s',ss.c(false,C.BLACK,'left',rb));
-        wf(ws,r,1,LOOKUP_bal(e.account),e.value,ss.m(false,C.BLACK,rb));
+        const isCPE = e.account === 'Current Period Earnings';
+        const formula = isCPE ? `'P & L'!B13` : LOOKUP_bal(e.account);
+        const note    = isCPE ? `= Net Profit from P & L tab (B13)` : `LOOKUP last balance from Raw Ledger col J`;
+        wf(ws,r,1,formula,e.value,ss.m(false,C.BLACK,rb));
         wf(ws,r,2,`IF(SUM(B${sr}:B${sr+entries.length-1})=0,0,B${r}/SUM(B${sr}:B${sr+entries.length-1}))`,total?e.value/total:0,ss.p(false,C.BLACK,rb));
-        wv(ws,r,3,typeLbl,'s',ss.pill(bg_c==='1F3864'?C.BLUE_LT:bg_c==='17375E'?C.YLW_LT:C.GRN_LT,C.BLACK));
-        wv(ws,r,4,`=LOOKUP('${RL}'!J, acct="${e.account}")`,'s',{...ss.note(),numFmt:'@'});
+        wv(ws,r,3,typeLbl,'s',ss.pill(bg_c===C.NAVY3?C.BLUE_LT:bg_c===C.TEAL?C.YLW_LT:C.GRN_LT,C.BLACK));
+        wv(ws,r,4,note,'s',{...ss.note(),numFmt:'@'});
         r++;
       });
       wv(ws,r,0,'Total','s',ss.tL(bg_c));
       wf(ws,r,1,`SUM(B${sr}:B${r-1})`,total,ss.tM(bg_c));
       wf(ws,r,2,'1',1,ss.tP(bg_c));
-      r+=2;
+      const totalRow = r; r+=2;
+      return totalRow;
     };
 
-    writeBS('ASSETS',      bs.assets,      bs.totals.assetsTotal,      C.NAVY3,  'Asset');
-    writeBS('LIABILITIES', bs.liabilities, bs.totals.liabilitiesTotal, C.TEAL,   'Liability');
-    writeBS('EQUITY',      bs.equity,      bs.totals.equityTotal,      C.GRN_HDR,'Equity');
+    const aR = writeBS('ASSETS',      bs.assets,      bs.totals.assetsTotal,      C.NAVY3,  'Asset');
+    const lR = writeBS('LIABILITIES', bs.liabilities, bs.totals.liabilitiesTotal, C.TEAL,   'Liability');
+    const eR = writeBS('EQUITY',      bs.equity,      bs.totals.equityTotal,      C.GRN_HDR,'Equity');
 
-    // Reconciliation
+    // Reconciliation — uses actual tracked row numbers
     bg(ws,r,0,4,C.GOLD); wv(ws,r,0,'  BALANCE SHEET RECONCILIATION','s',ss.secH(C.GOLD)); r++;
-    const aR=6+bs.assets.length;
-    const lR=aR+3+bs.liabilities.length;
-    const eR=lR+3+bs.equity.length;
     [
-      ['Total Assets',        bs.totals.assetsTotal,                          `B${aR}`],
-      ['Liabilities + Equity',bs.totals.liabilitiesTotal+bs.totals.equityTotal,`B${lR}+B${eR}`],
-      ['Variance',            bs.variance,                                    `B${aR}-(B${lR}+B${eR})`],
+      ['Total Assets',         bs.totals.assetsTotal,                           `B${aR}`],
+      ['Liabilities + Equity', bs.totals.liabilitiesTotal+bs.totals.equityTotal,`B${lR}+B${eR}`],
+      ['Variance (A − L − E)', bs.variance,                                     `B${aR}-(B${lR}+B${eR})`],
     ].forEach(([lbl,val,fml],i)=>{
       const isVar=i===2; const fg=isVar?(bs.isBalanced?C.GREEN:C.RED):C.BLACK;
       wv(ws,r,0,String(lbl),'s',ss.c(true,fg));
