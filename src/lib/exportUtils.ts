@@ -117,17 +117,17 @@ const TEQ   = ['Equity','equity','Retained Earnings','Opening Balance Equity'];
 
 // Clean SUMIF chain — one per type string, all chained with +
 const SUMIF_chain = (types: string[], col: 'I' | 'J') =>
-  types.map(t => `SUMIF('${RL}'!B$2:B$${DEND},"${t}",'${RL}'!${col}$2:${col}$${DEND})`).join('+');
+  `IFERROR(${types.map(t => `SUMIF('${RL}'!B$2:B$${DEND},"${t}",'${RL}'!${col}$2:${col}$${DEND})`).join('+')},0)`;
 
-// SUMPRODUCT for type group + month filter
+// SUMPRODUCT for type group + month — IFERROR on TEXT prevents #VALUE on empty/text date cells
 const SUMPRODUCT_month = (types: string[], mk: string) => {
   const typeFilter = types.map(t => `('${RL}'!B$2:B$${DEND}="${t}")`).join('+');
-  return `SUMPRODUCT(((${typeFilter})>0)*(TEXT('${RL}'!C$2:C$${DEND},"YYYY-MM")="${mk}")*('${RL}'!I$2:I$${DEND}))`;
+  return `IFERROR(SUMPRODUCT(((${typeFilter})>0)*(IFERROR(TEXT('${RL}'!C$2:C$${DEND},"YYYY-MM"),"")="${mk}")*ISNUMBER('${RL}'!I$2:I$${DEND})*('${RL}'!I$2:I$${DEND})),0)`;
 };
 
 // SUMPRODUCT for specific account + month
 const SUMPRODUCT_acct = (acct: string, mk: string) =>
-  `SUMPRODUCT(('${RL}'!A$2:A$${DEND}="${acct.replace(/"/g, '""')}")*(TEXT('${RL}'!C$2:C$${DEND},"YYYY-MM")="${mk}")*('${RL}'!I$2:I$${DEND}))`;
+  `IFERROR(SUMPRODUCT(('${RL}'!A$2:A$${DEND}="${acct.replace(/"/g, '""')}")*(IFERROR(TEXT('${RL}'!C$2:C$${DEND},"YYYY-MM"),"")="${mk}")*ISNUMBER('${RL}'!I$2:I$${DEND})*('${RL}'!I$2:I$${DEND})),0)`;
 
 // LOOKUP for last balance
 const LOOKUP_bal = (acct: string) =>
