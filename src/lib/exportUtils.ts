@@ -178,151 +178,167 @@ export function exportExcel(
   // ══ Sheet 1: DASHBOARD ════════════════════════════════════════════════════
   {
     const ws: CS = {};
-
-    // ── Banner row 1 (full width A1:L1) ──
-    for (let c = 0; c <= 11; c++) { ws[`${L(c)}1`] = { v: '', t: 's', s: { fill: Fill(C.NAVY) } }; }
-    wv(ws, 1, 0, `📊  FINANCIAL ANALYSIS DASHBOARD`, 's', { ...ss.titl(C.NAVY, 20), font: F(true, 20, C.WHITE) });
-    wv(ws, 2, 0, `${co}`, 's', { ...ss.sub(C.NAVY), font: F(true, 12, C.BLUE_LT) });
-    wv(ws, 2, 4, `Generated: ${gd}`, 's', ss.sub(C.NAVY));
-    wv(ws, 2, 8, `Transactions: ${analysis.totalTransactions.toLocaleString()}`, 's', ss.sub(C.NAVY));
-    for (let c = 1; c <= 11; c++) { ws[`${L(c)}2`] = ws[`${L(c)}2`] ?? { v:'', t:'s', s:ss.sub(C.NAVY) }; }
-
-    // ── Row 3: separator ──
-    for (let c = 0; c <= 11; c++) { ws[`${L(c)}3`] = { v:'', t:'s', s:{ fill: Fill(C.NAVY2) } }; }
-
-    // ── KPI CARDS (rows 5-8, groups of 2 cols each) ──
-    const kpis = [
-      { label:'Total Revenue',   val: pl.totalRevenue,   fmt: FMT_MONEY0, fg: C.GRN_HDR, },
-      { label:'Gross Profit',    val: pl.grossProfit,    fmt: FMT_MONEY0, fg: C.GREEN2,  },
-      { label:'Net Profit',      val: pl.netProfit,      fmt: FMT_MONEY0, fg: pl.netProfit>=0?C.GRN_HDR:C.RED, },
-      { label:'Gross Margin',    val: pl.grossMargin,    fmt: FMT_PCT,    fg: C.NAVY2,   },
-      { label:'Net Margin',      val: pl.netMargin,      fmt: FMT_PCT,    fg: C.NAVY2,   },
-    ];
-
-    kpis.forEach((kpi, i) => {
-      const col = i * 2;
-      const labelStyle: CS = {
-        font: F(true, 9, C.DGRAY),
-        fill: Fill(C.OFF),
-        alignment: Aln('center', 'bottom'),
-        border: bdrBox(C.LGRAY),
-      };
-      const valStyle: CS = {
-        font: F(true, 18, kpi.fg),
-        fill: Fill(C.WHITE),
-        numFmt: kpi.fmt,
-        alignment: Aln('center', 'center'),
-        border: { ...bdrBox(C.LGRAY), bottom: Bdr('medium', kpi.fg) },
-      };
-      wv(ws, 5, col, kpi.label.toUpperCase(), 's', labelStyle);
-      ws[`${L(col)}5`].s.border = { ...ws[`${L(col)}5`].s.border, top: Bdr('medium', kpi.fg), left: Bdr('medium', kpi.fg), right: Bdr('medium', kpi.fg) };
-      wv(ws, 6, col, typeof kpi.val === 'number' ? kpi.val : 0, 'n', valStyle);
-      wv(ws, 7, col, '', 's', { fill: Fill(C.WHITE) }); // spacer
-    });
-
-    // ── BS STATUS card (rightmost) ──
     const bsOK = bs.isBalanced;
-    wv(ws, 5, 10, 'BALANCE SHEET', 's', { font: F(true, 9, C.DGRAY), fill: Fill(C.OFF), alignment: Aln('center', 'bottom'), border: { top: Bdr('medium', bsOK?C.GRN_HDR:C.RED), left: Bdr('medium', bsOK?C.GRN_HDR:C.RED), right: Bdr('medium', bsOK?C.GRN_HDR:C.RED) } });
-    wv(ws, 6, 10, bsOK ? '✔  BALANCED' : '✘  NOT BALANCED', 's', {
-      font: F(true, 14, bsOK ? C.GREEN : C.RED),
-      fill: Fill(bsOK ? C.GRN_LT : C.RED_LT),
-      alignment: Aln('center', 'center'),
-      border: { ...bdrBox(bsOK ? C.GRN_HDR : C.RED), bottom: Bdr('medium', bsOK ? C.GRN_HDR : C.RED) },
-    });
 
-    // ── SECTION: P&L SUMMARY (rows 9-18) ──
-    const PL_START = 10;
-    wv(ws, PL_START, 0, '  PROFIT & LOSS SUMMARY', 's', ss.hdrL(C.NAVY, C.WHITE, 11));
-    wv(ws, PL_START, 4, 'Formula Source', 's', ss.hdrC(C.NAVY2, C.WHITE, 9));
-    bg(ws, PL_START, 1, 3, C.NAVY);
-    bg(ws, PL_START, 5, 11, C.NAVY);
+    // Helper: write a simple styled cell
+    const w = (r: number, c: number, v: string|number, t: string, style: CS) => { ws[`${L(c)}${r}`] = { v, t, s: style }; };
+    const wn = (r: number, c: number, v: number, fmt: string, bold: boolean, fg: string, bg?: string) =>
+      w(r, c, v, 'n', { font: F(bold, bold?16:11, fg), numFmt: fmt, alignment: Aln('right','center'), ...(bg?{fill:Fill(bg)}:{}), border: bdrBox(C.LGRAY) });
+    const fillRow = (r: number, fromC: number, toC: number, rgb: string) => {
+      for (let c = fromC; c <= toC; c++) { const a=`${L(c)}${r}`; ws[a]=ws[a]??{v:'',t:'s'}; ws[a].s={fill:Fill(rgb)}; }
+    };
 
-    const plRows: [string, number, string, string][] = [
-      ['Revenue',        pl.totalRevenue,   C.GRN_LT,  `=SUMIF('${RL}'!B:B,"Income",'${RL}'!I:I)+SUMIF('${RL}'!B:B,"Sales",'${RL}'!I:I)`],
-      ['Cost of Goods',  pl.totalCogs,      C.OFF,      `=SUMIF('${RL}'!B:B,"Cost of Goods Sold",'${RL}'!I:I)`],
-      ['Gross Profit',   pl.grossProfit,    C.GRN_LT,  `=B${PL_START+1}-B${PL_START+2}`],
-      ['Operating Exp',  pl.totalExpenses,  C.OFF,      `=SUMIF('${RL}'!B:B,"Expense",'${RL}'!I:I)+SUMIF('${RL}'!B:B,"Expenses",'${RL}'!I:I)`],
-      ['Net Profit',     pl.netProfit,      pl.netProfit>=0?C.GRN_LT:C.RED_LT, `=B${PL_START+3}-B${PL_START+4}`],
+    // ── Row 1: Title banner ──────────────────────────────────────────────────
+    fillRow(1, 0, 9, C.NAVY);
+    w(1,0,`FINANCIAL ANALYSIS DASHBOARD  —  ${co}`,'s',{ font:F(true,18,C.WHITE), fill:Fill(C.NAVY), alignment:Aln('left','center') });
+    w(1,6,`Generated: ${gd}`,'s',{ font:F(false,10,C.NAVY_LT), fill:Fill(C.NAVY), alignment:Aln('right','center') });
+
+    // ── Row 2: Meta info ─────────────────────────────────────────────────────
+    fillRow(2, 0, 9, C.NAVY2);
+    w(2,0,`Source: ${fileName}`,'s',{ font:F(false,9,C.WHITE,true), fill:Fill(C.NAVY2), alignment:Aln('left','center') });
+    w(2,4,`Transactions: ${analysis.totalTransactions.toLocaleString()}`,'s',{ font:F(false,9,C.WHITE,true), fill:Fill(C.NAVY2), alignment:Aln('center','center') });
+    w(2,7,`Period: ${mom?.months?.[0]??'—'} → ${mom?.months?.slice(-1)[0]??'—'}`,'s',{ font:F(false,9,C.WHITE,true), fill:Fill(C.NAVY2), alignment:Aln('right','center') });
+
+    // ── Row 3: spacer ────────────────────────────────────────────────────────
+    fillRow(3, 0, 9, C.LGRAY);
+
+    // ── Rows 4-7: KPI CARDS ──────────────────────────────────────────────────
+    // Each KPI gets 2 columns: label row 4, value row 5, spacer rows 6-7
+    const kpis = [
+      { label:'TOTAL REVENUE',  val:pl.totalRevenue,  fmt:FMT_MONEY0, fg:C.GRN_HDR, border:C.GRN_HDR },
+      { label:'GROSS PROFIT',   val:pl.grossProfit,   fmt:FMT_MONEY0, fg:C.GREEN2,  border:C.GREEN2 },
+      { label:'NET PROFIT',     val:pl.netProfit,     fmt:FMT_MONEY0, fg:pl.netProfit>=0?C.GRN_HDR:C.RED, border:pl.netProfit>=0?C.GRN_HDR:C.RED },
+      { label:'GROSS MARGIN',   val:pl.grossMargin,   fmt:FMT_PCT,    fg:C.NAVY2,   border:C.NAVY2 },
+      { label:'NET MARGIN',     val:pl.netMargin,     fmt:FMT_PCT,    fg:C.NAVY2,   border:C.NAVY2 },
     ];
 
-    plRows.forEach(([label, val, rowBg, formula], i) => {
-      const r = PL_START + 1 + i;
-      const isBold = label === 'Gross Profit' || label === 'Net Profit';
-      const fg = label === 'Net Profit' ? (val >= 0 ? C.GREEN : C.RED) : C.BLACK;
-      wv(ws, r, 0, `  ${label}`, 's', ss.c(isBold, fg, 'left', rowBg));
-      ws[`${L(0)}${r}`].s.border = { left: Bdr('medium', C.NAVY), ...bdrData() };
-      wv(ws, r, 1, val, 'n', { ...ss.m(isBold, fg, rowBg), numFmt: FMT_MONEY });
-      wv(ws, r, 2, pl.totalRevenue ? val / pl.totalRevenue : 0, 'n', ss.p(isBold, fg, rowBg));
-      wv(ws, r, 3, formula, 's', { font: F(false, 8, C.NAVY3, true), fill: Fill(C.BLUE_LT), alignment: Aln('left', 'center'), numFmt:'@' });
-      ws[`${L(3)}${r}`].s.border = { right: Bdr('medium', C.NAVY), ...bdrData() };
+    kpis.forEach(({ label, val, fmt, fg, border }, i) => {
+      const c = i * 2;
+      // Label cell (row 4)
+      w(4,c,label,'s',{
+        font:F(true,9,C.DGRAY),
+        fill:Fill(C.OFF),
+        alignment:Aln('center','center'),
+        border:{ top:Bdr('medium',border), left:Bdr('medium',border), right:Bdr('medium',border), bottom:Bdr('hair',C.LGRAY) },
+      });
+      // Value cell (row 5)
+      w(5,c,val,'n',{
+        font:F(true,20,fg),
+        numFmt:fmt,
+        fill:Fill(C.WHITE),
+        alignment:Aln('center','center'),
+        border:{ bottom:Bdr('medium',border), left:Bdr('medium',border), right:Bdr('medium',border), top:Bdr('hair',C.LGRAY) },
+      });
+      // Fill the second column of each KPI pair same style
+      w(4,c+1,''  ,'s',{fill:Fill(C.OFF),  border:{ top:Bdr('medium',border), right:Bdr('medium',border), bottom:Bdr('hair',C.LGRAY), left:Bdr('hair',C.LGRAY) }});
+      w(5,c+1,'','s',{fill:Fill(C.WHITE),border:{ bottom:Bdr('medium',border), right:Bdr('medium',border), top:Bdr('hair',C.LGRAY),   left:Bdr('hair',C.LGRAY) }});
     });
 
-    // ── SECTION: Balance Sheet snapshot (rows 10-18, cols 5-11) ──
-    wv(ws, PL_START, 5, '  BALANCE SHEET SNAPSHOT', 's', ss.hdrL(C.TEAL, C.WHITE, 11));
-    bg(ws, PL_START, 6, 11, C.TEAL);
+    // BS Status card (cols 10-11, rows 4-5)
+    w(4,9,'BALANCE SHEET','s',{
+      font:F(true,9,bsOK?C.GREEN:C.RED),
+      fill:Fill(C.OFF),
+      alignment:Aln('center','center'),
+      border:{ top:Bdr('medium',bsOK?C.GRN_HDR:C.RED), left:Bdr('medium',bsOK?C.GRN_HDR:C.RED), right:Bdr('medium',bsOK?C.GRN_HDR:C.RED), bottom:Bdr('hair',C.LGRAY) },
+    });
+    w(5,9,bsOK?'✔  BALANCED':'✘  NOT BALANCED','s',{
+      font:F(true,13,bsOK?C.GREEN:C.RED),
+      fill:Fill(bsOK?C.GRN_LT:C.RED_LT),
+      alignment:Aln('center','center'),
+      border:{ bottom:Bdr('medium',bsOK?C.GRN_HDR:C.RED), left:Bdr('medium',bsOK?C.GRN_HDR:C.RED), right:Bdr('medium',bsOK?C.GRN_HDR:C.RED), top:Bdr('hair',C.LGRAY) },
+    });
 
-    const bsSections = [
-      { label:'ASSETS',      val:bs.totals.assetsTotal,      color:C.NAVY2 },
-      { label:'LIABILITIES', val:bs.totals.liabilitiesTotal, color:C.TEAL },
-      { label:'EQUITY',      val:bs.totals.equityTotal,      color:C.GREEN },
-      { label:'VARIANCE',    val:bs.variance,                color:bsOK?C.GRN_HDR:C.RED },
+    // ── Row 7: spacer ────────────────────────────────────────────────────────
+    fillRow(7, 0, 9, C.OFF);
+
+    // ── Rows 8-14: P&L SUMMARY TABLE ─────────────────────────────────────────
+    // Header
+    w(8,0,'  PROFIT & LOSS SUMMARY','s',ss.hdrL(C.NAVY));
+    w(8,1,'Amount','s',ss.hdrC(C.NAVY));
+    w(8,2,'% of Revenue','s',ss.hdrC(C.NAVY));
+    w(8,3,'Linked from P & L tab','s',ss.hdrC(C.NAVY2,C.WHITE,9));
+    fillRow(8,4,5,C.NAVY);
+    // BS Snapshot header cols 6-9
+    w(8,5,'  BALANCE SHEET SNAPSHOT','s',ss.hdrL(C.TEAL));
+    w(8,6,'Value','s',ss.hdrC(C.TEAL));
+    fillRow(8,7,9,C.TEAL);
+
+    const plSummary = [
+      { label:'Revenue',      val:pl.totalRevenue,  bg:C.GRN_LT,  link:`='P & L'!B7`,  bold:false, fg:C.BLACK },
+      { label:'COGS',         val:pl.totalCogs,     bg:C.OFF,      link:`='P & L'!B9`,  bold:false, fg:C.BLACK },
+      { label:'Gross Profit', val:pl.grossProfit,   bg:C.GRN_LT,  link:`='P & L'!B10`, bold:true,  fg:C.GREEN },
+      { label:'Operating Exp',val:pl.totalExpenses, bg:C.OFF,      link:`='P & L'!B12`, bold:false, fg:C.BLACK },
+      { label:'Net Profit',   val:pl.netProfit,     bg:pl.netProfit>=0?C.GRN_LT:C.RED_LT, link:`='P & L'!B13`, bold:true, fg:pl.netProfit>=0?C.GREEN:C.RED },
     ];
 
-    bsSections.forEach(({ label, val, color }, i) => {
-      const r = PL_START + 1 + i;
-      wv(ws, r, 5, label, 's', ss.c(true, color, 'left', C.OFF));
-      wv(ws, r, 6, val, 'n', { ...ss.m(true, color), numFmt: FMT_MONEY, ...(i===3?{fill:Fill(bsOK?C.GRN_LT:C.RED_LT)}:{}) });
+    const bsSnapshot = [
+      { label:'Assets',      val:bs.totals.assetsTotal,      fg:C.NAVY2,  link:`='Balance Sheet'!B${9+bs.assets.length}` },
+      { label:'Liabilities', val:bs.totals.liabilitiesTotal, fg:C.TEAL,   link:`='Balance Sheet'!B${9+bs.assets.length+3+bs.liabilities.length}` },
+      { label:'Equity',      val:bs.totals.equityTotal,      fg:C.GREEN,  link:`='Balance Sheet'!B${9+bs.assets.length+3+bs.liabilities.length+3+bs.equity.length}` },
+      { label:'Variance',    val:bs.variance,                fg:bsOK?C.GREEN:C.RED, link:`='Balance Sheet'!B${9+bs.assets.length+3+bs.liabilities.length+3+bs.equity.length+4}` },
+    ];
+
+    plSummary.forEach(({ label, val, bg: rb, link, bold, fg }, i) => {
+      const r = 9 + i;
+      w(r,0,`  ${label}`,'s',ss.c(bold,fg,'left',rb));
+      // Link to P&L tab instead of raw value
+      ws[`B${r}`] = { t:'n', f:link.replace('=',''), v:val, s:{...ss.m(bold,fg,rb), numFmt:FMT_MONEY} };
+      ws[`C${r}`] = { t:'n', f:`IF(B9=0,0,B${r}/B9)`, v:pl.totalRevenue?val/pl.totalRevenue:0, s:ss.p(bold,fg,rb) };
+      w(r,3,link.replace('=','').replace(/'/g,''),'s',{font:F(false,8,C.NAVY3,true),fill:Fill(C.BLUE_LT),alignment:Aln('left','center')});
+      fillRow(r,4,4,rb);
     });
 
-    // ── SECTION: Top Accounts row 20-26 ──
-    const TA_ROW = 20;
-    wv(ws, TA_ROW, 0, '  TOP 5 EXPENSE ACCOUNTS', 's', ss.hdrL(C.RED, C.WHITE, 10));
-    bg(ws, TA_ROW, 1, 3, C.RED);
-    wv(ws, TA_ROW, 4, '  TOP 5 INCOME ACCOUNTS', 's', ss.hdrL(C.GRN_HDR, C.WHITE, 10));
-    bg(ws, TA_ROW, 5, 7, C.GRN_HDR);
-
-    const topExp = bs.liabilities.slice(0,5);
-    const incAccts = bs.assets.slice(0,5);
-
-    // Top expense from analysis
-    analysis.inconsistentVendors.slice(0,5).forEach((v, i) => {
-      const r = TA_ROW + 1 + i; const rb = i%2===0?C.WHITE:C.OFF;
-      wv(ws, r, 0, v.vendor, 's', ss.c(false, C.BLACK, 'left', rb));
-      wv(ws, r, 1, v.reason, 's', ss.c(false, C.DGRAY, 'left', rb));
-    });
-    bs.liabilities.slice(0,5).forEach((e, i) => {
-      const r = TA_ROW + 1 + i; const rb = i%2===0?C.WHITE:C.OFF;
-      wv(ws, r, 4, e.account, 's', ss.c(false, C.BLACK, 'left', rb));
-      wv(ws, r, 5, e.value, 'n', ss.m(false, C.BLACK, rb));
+    bsSnapshot.forEach(({ label, val, fg, link }, i) => {
+      const r = 9 + i;
+      const rb = i%2===0?C.WHITE:C.OFF;
+      const isVar = i===3;
+      w(r,5,label,'s',ss.c(true,fg,'left',isVar?(bsOK?C.GRN_LT:C.RED_LT):rb));
+      ws[`G${r}`] = { t:'n', f:link.replace('=',''), v:val, s:{...ss.m(true,fg,isVar?(bsOK?C.GRN_LT:C.RED_LT):rb), numFmt:FMT_MONEY} };
+      fillRow(r,7,9,rb);
     });
 
-    // ── FLAGS ROW ──
-    const FL = 28;
-    wv(ws, FL, 0, `⚠  ${analysis.inconsistentVendors.length} Inconsistent Vendors`, 's', ss.pill(analysis.inconsistentVendors.length>0?C.YLW:C.GRN_LT, analysis.inconsistentVendors.length>0?C.BLACK:C.GREEN));
-    wv(ws, FL, 2, `⚠  ${analysis.duplicates.length} Duplicate Transactions`, 's', ss.pill(analysis.duplicates.length>0?C.RED_LT:C.GRN_LT, analysis.duplicates.length>0?C.RED:C.GREEN));
-    wv(ws, FL, 4, `📁  ${rows.length.toLocaleString()} Total Rows in Raw Ledger`, 's', ss.pill(C.BLUE_LT, C.NAVY));
-    wv(ws, FL, 6, `📅  Period: ${mom?.months?.[0] ?? '—'} → ${mom?.months?.slice(-1)[0] ?? '—'}`, 's', ss.pill(C.NAVY_LT, C.NAVY));
+    // ── Row 15: spacer ───────────────────────────────────────────────────────
+    fillRow(15, 0, 9, C.OFF);
 
-    ws['!ref'] = `A1:L${FL + 2}`;
-    ws['!cols'] = [W(22),W(16),W(12),W(36),W(22),W(16),W(12),W(12),W(12),W(12),W(22),W(12)];
-    ws['!rows'] = [{ hpt:36 },{hpt:20},{hpt:8},{},{hpt:20},{hpt:44},{hpt:8},{},{hpt:24}];
+    // ── Rows 16-22: DUPLICATES & FLAGS ───────────────────────────────────────
+    w(16,0,'  AUDIT FLAGS','s',ss.hdrL(analysis.duplicates.length>0||analysis.inconsistentVendors.length>0?C.AMBER:C.GRN_HDR));
+    fillRow(16,1,9,analysis.duplicates.length>0||analysis.inconsistentVendors.length>0?C.AMBER:C.GRN_HDR);
+
+    const flags = [
+      { label:'Inconsistent Vendors', val:analysis.inconsistentVendors.length, bad: analysis.inconsistentVendors.length>0 },
+      { label:'Duplicate Transactions', val:analysis.duplicates.length, bad: analysis.duplicates.length>0 },
+      { label:'Total Transactions', val:analysis.totalTransactions, bad: false },
+      { label:'Months in Report', val:mom?.months?.length??0, bad: false },
+    ];
+
+    flags.forEach(({label, val, bad}, i) => {
+      const r = 17+i; const rb = i%2===0?C.WHITE:C.OFF;
+      w(r,0,label,'s',ss.c(false,bad?C.RED:C.BLACK,'left',rb));
+      w(r,1,val,'n',{...ss.c(true,bad?C.RED:C.GREEN,'center',rb),numFmt:'#,##0'});
+      w(r,2,bad?'⚠ Review needed':'✔ OK','s',ss.c(true,bad?C.RED:C.GREEN,'left',bad?C.RED_LT:C.GRN_LT));
+      fillRow(r,3,9,rb);
+    });
+
+    ws['!ref'] = `A1:J22`;
+    ws['!cols'] = [W(22),W(16),W(14),W(30),W(4),W(20),W(16),W(10),W(10),W(20)];
+    ws['!rows'] = [{hpt:36},{hpt:20},{hpt:6},{hpt:22},{hpt:40},{hpt:6},{hpt:4},{hpt:22},{hpt:22},{hpt:22},{hpt:22},{hpt:22},{hpt:22},{hpt:6},{hpt:4},{hpt:22}];
     ws['!merges'] = [
-      MG(0,0,0,11), // title banner
-      MG(1,0,1,3), MG(1,4,1,7), MG(1,8,1,11), // subtitle cells
-      MG(2,0,2,11), // separator
-      // KPI cards rows 5-6 (5 cards × 2 cols = cols 0-9, BS status at cols 10-11)
-      ...Array.from({length:5},(_,i)=>MG(4,i*2,4,i*2+1)),
-      ...Array.from({length:5},(_,i)=>MG(5,i*2,5,i*2+1)),
-      MG(4,10,4,11), // BS status label
-      MG(5,10,5,11), // BS status value
-      // P&L section header (no overlapping merges)
-      MG(9,0,9,3), MG(9,4,9,11),
-      // Monthly section header
-      MG(19,0,19,3), MG(19,4,19,7),
-      // Flag pills
-      MG(27,0,27,1), MG(27,2,27,3), MG(27,4,27,5), MG(27,6,27,7),
+      MG(0,0,0,9), // title
+      MG(1,0,1,3), MG(1,4,1,6), MG(1,7,1,9), // meta
+      MG(2,0,2,9), // separator
+      // KPI label merges (row 4)
+      MG(3,0,3,1),MG(3,2,3,3),MG(3,4,3,5),MG(3,6,3,7),MG(3,8,3,8),MG(3,9,3,9),
+      // KPI value merges (row 5)
+      MG(4,0,4,1),MG(4,2,4,3),MG(4,4,4,5),MG(4,6,4,7),MG(4,8,4,8),MG(4,9,4,9),
+      // P&L + BS headers
+      MG(7,0,7,3),MG(7,5,7,9),
+      // BS snapshot cells
+      MG(8,5,8,6),MG(9,5,9,6),MG(10,5,10,6),MG(11,5,11,6),MG(12,5,12,6),
+      // Flag section
+      MG(15,0,15,9),
+      MG(16,2,16,9),MG(17,2,17,9),MG(18,2,18,9),MG(19,2,19,9),MG(20,2,20,9),
     ];
-    ws['!freeze'] = { xSplit:0, ySplit:4 };
+    ws['!freeze'] = { xSplit:0, ySplit:3 };
     XLSX.utils.book_append_sheet(wb, ws, 'Dashboard');
   }
 
