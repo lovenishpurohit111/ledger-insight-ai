@@ -17,6 +17,27 @@ const toNum = (s: string): number => {
   const n = parseFloat(s.replace(/[^0-9.]/g, ''));
   return isNaN(n) ? 0 : neg ? -n : n;
 };
+
+// Normalize any date string to ISO YYYY-MM-DD so LEFT(date,7) = "YYYY-MM" in Excel
+const toIsoDate = (s: string): string => {
+  if (!s.trim()) return s;
+  // Already ISO: 2024-01-15
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s.trim())) return s.trim();
+  // US format: MM/DD/YYYY or M/D/YYYY
+  const us = s.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (us) {
+    const [, m, d, y] = us;
+    return `${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`;
+  }
+  // Try native Date parse as fallback
+  try {
+    const dt = new Date(s);
+    if (!isNaN(dt.getTime())) {
+      return dt.toISOString().slice(0, 10);
+    }
+  } catch { /* ignore */ }
+  return s;
+};
 const pctStr = (n: number, d = 1) => `${(n * 100).toFixed(d)}%`;
 const base = (f: string) => f.replace(/\.[^.]+$/, '') || 'ledger';
 
@@ -365,9 +386,12 @@ export function exportExcel(
         if (isAmt) {
           const num = toNum(String(raw));
           wv(ws, rn, ci, num, 'n', { ...ss.m(false,num<0?C.RED:C.BLACK,rb), numFmt:FMT_MONEY });
+        } else if (isDate) {
+          // Normalize to ISO YYYY-MM-DD so LEFT(date,7) always returns YYYY-MM
+          const isoDate = toIsoDate(String(raw));
+          wv(ws, rn, ci, isoDate, 's', { ...ss.c(false,C.BLACK,'center',rb) });
         } else {
           wv(ws, rn, ci, String(raw), 's', ss.c(false,C.BLACK,'left',rb));
-          if(isDate) ws[`${L(ci)}${rn}`].s.alignment = Aln('center','center');
         }
       });
       // Colour code account type column (col B = index 1)
