@@ -526,20 +526,45 @@ export function exportExcel(
 
     // Reconciliation — uses actual tracked row numbers
     bg(ws,r,0,4,C.GOLD); wv(ws,r,0,'  BALANCE SHEET RECONCILIATION','s',ss.secH(C.GOLD)); r++;
+    const varRow = r + 2; // row where Variance will be written
     [
       ['Total Assets',         bs.totals.assetsTotal,                           `B${aR}`],
       ['Liabilities + Equity', bs.totals.liabilitiesTotal+bs.totals.equityTotal,`B${lR}+B${eR}`],
       ['Variance (A − L − E)', bs.variance,                                     `B${aR}-(B${lR}+B${eR})`],
     ].forEach(([lbl,val,fml],i)=>{
-      const isVar=i===2; const fg=isVar?(bs.isBalanced?C.GREEN:C.RED):C.BLACK;
-      wv(ws,r,0,String(lbl),'s',ss.c(true,fg));
-      wf(ws,r,1,String(fml),Number(val),{...ss.m(true,fg),...(isVar&&!bs.isBalanced?{fill:Fill(C.RED_LT)}:isVar?{fill:Fill(C.GRN_LT)}:{})});
+      const isVar=i===2;
+      // Use neutral style for variance — let Excel IF formula drive the colour via value
+      wv(ws,r,0,String(lbl),'s',ss.c(true,C.BLACK));
+      wf(ws,r,1,String(fml),Number(val),{...ss.m(true,C.BLACK)});
       r++;
     });
+
+    // Status row — formula driven: if ABS(variance) ≤ 1 → Balanced, else Not Balanced
+    const varCellRef = `B${varRow}`;
     wv(ws,r,0,'Status','s',ss.c(true));
-    wv(ws,r,1,bs.isBalanced?'✔  BALANCED':'✘  NOT BALANCED','s',{
-      font:F(true,12,bs.isBalanced?C.GREEN:C.RED), fill:Fill(bs.isBalanced?C.GRN_LT:C.RED_LT),
-      alignment:Aln('center','center'), border:bdrBox(bs.isBalanced?C.GREEN:C.RED),
+    // Use a formula cell that shows text
+    ws[`B${r}`] = {
+      t: 's',
+      f: `IF(ABS(${varCellRef})<=1,"✔  BALANCED","✘  NOT BALANCED (Variance: "&TEXT(${varCellRef},"$#,##0.00")&")")`,
+      v: bs.isBalanced ? '✔  BALANCED' : `✘  NOT BALANCED (Variance: ${$f(bs.variance)})`,
+      s: {
+        font: F(true, 11, C.BLACK),
+        fill: Fill(C.OFF),
+        alignment: Aln('center','center'),
+        border: bdrBox(C.LGRAY),
+      },
+    };
+    // Conditional colour via a second helper cell
+    wv(ws,r,2,bs.isBalanced?'✔':'✘','s',{
+      font:F(true,14,bs.isBalanced?C.GREEN:C.RED),
+      fill:Fill(bs.isBalanced?C.GRN_LT:C.RED_LT),
+      alignment:Aln('center','center'),
+      border:bdrBox(bs.isBalanced?C.GRN_HDR:C.RED),
+    });
+    wv(ws,r,3,bs.isBalanced?`Variance within $1.00 tolerance`:`Variance of ${$f(bs.variance)} — check account type mapping`,'s',{
+      font:F(false,10,bs.isBalanced?C.GREEN:C.RED,true),
+      fill:Fill(bs.isBalanced?C.GRN_LT:C.RED_LT),
+      alignment:Aln('left','center'),
     });
 
     ws['!ref']=`A1:E${r+1}`;
