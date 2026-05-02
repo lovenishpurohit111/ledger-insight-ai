@@ -230,6 +230,7 @@ export function exportExcel(
   fileName:string,analysis:LedgerAnalysis,pl:ProfitAndLoss,
   bs:BalanceSheet,cf:CashFlowStatement,mom?:MoMPL,rawRows?:LedgerRow[],
 ):void{
+  try {
   const wb = XLSX.utils.book_new();
   const gd = new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'});
   const co = base(fileName);
@@ -356,20 +357,28 @@ export function exportExcel(
     ws['!cols']=[W(20),W(16),W(10),W(20),W(2),W(16),W(16),W(4),W(4),W(16)];
     ws['!rows']=[H(6),H(36),H(4),H(6),H(18),H(40),H(6),H(22),H(20),H(20),H(20),H(20),H(20),H(4),H(4),H(6),H(22),H(20),H(20),H(20),H(20)];
     ws['!merges']=[
-      MG(1,0,1,9), // title
-      MG(1,0,1,5), MG(1,6,1,9), // subtitle split
-      MG(2,0,2,9), // separator
-      MG(3,0,3,9), // spacer
-      // KPI label rows (row 5 = index 4)
-      MG(4,0,4,1),MG(4,2,4,3),MG(4,4,4,5),MG(4,6,4,7),MG(4,8,4,8),
-      // KPI value rows (row 6 = index 5)
-      MG(5,0,5,1),MG(5,2,5,3),MG(5,4,5,5),MG(5,6,5,7),MG(5,8,5,8),
-      MG(6,0,6,9), // spacer
-      // P&L section
+      // Row 2 (index 1): title
+      MG(1,0,1,9),
+      // Row 3 (index 2): separator bar
+      MG(2,0,2,9),
+      // Row 4 (index 3): spacer
+      MG(3,0,3,9),
+      // Row 5 (index 4): KPI label pairs — 5 cards × 2 cols
+      MG(4,0,4,1), MG(4,2,4,3), MG(4,4,4,5), MG(4,6,4,7), MG(4,8,4,8),
+      // Row 6 (index 5): KPI value pairs
+      MG(5,0,5,1), MG(5,2,5,3), MG(5,4,5,5), MG(5,6,5,7), MG(5,8,5,8),
+      // Row 7 (index 6): spacer
+      MG(6,0,6,9),
+      // Row 8 (index 7): section headers
       MG(7,0,7,4), MG(7,5,7,9),
-      MG(15,0,15,9), // spacer
-      MG(16,0,16,9), // audit header
-      MG(17,2,17,9),MG(18,2,18,9),MG(19,2,19,9),MG(20,2,20,9),
+      // Row 15 (index 14): rule
+      MG(14,0,14,9),
+      // Row 16 (index 15): spacer
+      MG(15,0,15,9),
+      // Row 17 (index 16): audit header
+      MG(16,0,16,9),
+      // Audit rows — status col spans 2-9
+      MG(17,2,17,9), MG(18,2,18,9), MG(19,2,19,9), MG(20,2,20,9),
     ];
     ws['!freeze']={xSplit:0,ySplit:4};
     XLSX.utils.book_append_sheet(wb,ws,'Dashboard');
@@ -503,7 +512,7 @@ export function exportExcel(
     ws['!ref']=`A1:F${totR}`;
     ws['!cols']=[W(30),W(16),W(12),W(16),W(16),W(10)];
     ws['!rows']=[H(6),H(28),H(18),H(4),H(6)];
-    ws['!merges']=[MG(1,0,1,5),MG(2,0,2,3),MG(2,4,2,5),MG(3,0,3,5),MG(4,0,4,5),MG(5,0,5,5),MG(6,0,6,5),MG(8,0,8,5),MG(9,0,9,5),MG(12,0,12,5),MG(13,0,13,5),MG(16,0,16,5),MG(17,0,17,5)];
+    ws['!merges']=[MG(0,0,0,5),MG(1,0,1,5),MG(2,0,2,3),MG(2,4,2,5),MG(3,0,3,5),MG(4,0,4,5),MG(5,0,5,5),MG(7,0,7,5),MG(8,0,8,5),MG(11,0,11,5),MG(12,0,12,5),MG(15,0,15,5),MG(16,0,16,5)];
     ws['!freeze']={xSplit:0,ySplit:5};
     XLSX.utils.book_append_sheet(wb,ws,'P & L');
   }
@@ -758,6 +767,10 @@ export function exportExcel(
   }
 
   XLSX.writeFile(wb,`${base(fileName)}_Financial_Analysis.xlsx`);
+  } catch(err) {
+    console.error('Excel export error:', err);
+    alert(`Excel export failed: ${err instanceof Error ? err.message : String(err)}`);
+  }
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
