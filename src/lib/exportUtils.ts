@@ -5,6 +5,12 @@ import type { CashFlowStatement } from './generateCashFlow';
 import type { ProfitAndLoss } from './generatePL';
 import type { MoMPL } from './generateMoMPL';
 import { monthLabel } from './generateMoMPL';
+// Inline helper to avoid any potential minification issues with named imports
+const _monthLabel = (key: string) => {
+  const [year, month] = key.split('-');
+  const d = new Date(Number(year), Number(month) - 1, 1);
+  return d.toLocaleString('en-US', { month: 'short', year: 'numeric' });
+};
 import type { LedgerRow } from '../../app/upload/upload-utils';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -69,7 +75,6 @@ const F = (bold: boolean, sz: number, rgb: string, italic=false) =>
 
 // ── Fill ──────────────────────────────────────────────────────────────────────
 const Fill = (rgb: string): CS => ({fgColor:{rgb}, patternType:'solid'});
-const noFill = (): CS => ({patternType:'none'});
 
 // ── Alignment ─────────────────────────────────────────────────────────────────
 const AL = (h: string, v='center', wrap=false): CS => ({horizontal:h, vertical:v, wrapText:wrap});
@@ -488,7 +493,6 @@ export function exportExcel(
       ws[`${L(i)}18`]={v:h,t:'s',s:{font:F(true,9,P.MID),fill:Fill(P.SLATE),alignment:AL(i===0?'left':'right','center'),border:bBotMed(P.RULE2)}};
     });
 
-    const maxRev = Math.max(...months.map(([,{revenue}])=>revenue),1);
     months.forEach(([mk,{revenue,cogs,expenses}],i)=>{
       const r=19+i; const rb=i%2===0?P.WHITE:P.OFFWHT;
       const net=revenue-(cogs??0)-expenses;
@@ -602,13 +606,13 @@ export function exportExcel(
 
     emptyRow(ws,1,0,nC-1);
     wv(ws,2,0,'Month-over-Month P&L','s',{font:F(true,16,P.INK),fill:Fill(P.WHITE),alignment:AL('left','center')});
-    wv(ws,3,0,`${co}  ·  ${monthLabel(months[0])} → ${monthLabel(months[months.length-1])}  ·  ${months.length} months`,'s',{font:F(false,9,P.MUTED,true),fill:Fill(P.WHITE),alignment:AL('left','center')});
+    wv(ws,3,0,`${co}  ·  ${_monthLabel(months[0])} → ${_monthLabel(months[months.length-1])}  ·  ${months.length} months`,'s',{font:F(false,9,P.MUTED,true),fill:Fill(P.WHITE),alignment:AL('left','center')});
     for(let c=0;c<=nC-1;c++) ws[`${L(c)}4`]={v:'',t:'s',s:{fill:Fill(P.INK)}};
     emptyRow(ws,5,0,nC-1);
 
     // Headers row 6
     ws['A6']={v:'Account',t:'s',s:S.colHdrL()};
-    months.forEach((m,i)=>ws[`${L(i+1)}6`]={v:monthLabel(m),t:'s',s:S.colHdr()});
+    months.forEach((m,i)=>ws[`${L(i+1)}6`]={v:_monthLabel(m),t:'s',s:S.colHdr()});
     ws[`${L(months.length+1)}6`]={v:'Total',t:'s',s:{...S.colHdr(),fill:Fill(P.SLATE)}};
 
     // MoM % row 7
