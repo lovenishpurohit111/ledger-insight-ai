@@ -38,7 +38,7 @@ const toIsoDate = (s: string): string => {
 };
 
 // ── Modern Minimal Palette ────────────────────────────────────────────────────
-const P = {
+var P: any = {
   // Charcoal / dark blue - primary
   INK:    '1A1F2E',  // Darkest - titles
   DARK:   '2C3E50',  // Dark - section headers
@@ -70,30 +70,30 @@ const P = {
 };
 
 // ── Font presets ──────────────────────────────────────────────────────────────
-const F = (bold: boolean, sz: number, rgb: string, italic=false) =>
+var F = (bold: boolean, sz: number, rgb: string, italic=false) =>
   ({bold, sz, name:'Calibri', color:{rgb}, italic});
 
 // ── Fill ──────────────────────────────────────────────────────────────────────
-const Fill = (rgb: string): CS => ({fgColor:{rgb}, patternType:'solid'});
+var Fill = (rgb: string): CS => ({fgColor:{rgb}, patternType:'solid'});
 
 // ── Alignment ─────────────────────────────────────────────────────────────────
-const AL = (h: string, v='center', wrap=false): CS => ({horizontal:h, vertical:v, wrapText:wrap});
+var AL = (h: string, v='center', wrap=false): CS => ({horizontal:h, vertical:v, wrapText:wrap});
 
 // ── Borders – minimal approach ────────────────────────────────────────────────
-const bNone   = {};
-const bBot    = (c=P.RULE)  => ({bottom:{style:'thin',  color:{rgb:c}}});
-const bBotMed = (c=P.RULE2) => ({bottom:{style:'medium',color:{rgb:c}}});
-const bBox    = (c=P.RULE)  => ({top:{style:'thin',color:{rgb:c}},bottom:{style:'thin',color:{rgb:c}},left:{style:'thin',color:{rgb:c}},right:{style:'thin',color:{rgb:c}}});
-const bLeft   = (c=P.RULE)  => ({left:{style:'thin',color:{rgb:c}}});
+var bNone   = {};
+var bBot    = (c=P.RULE)  => ({bottom:{style:'thin',  color:{rgb:c}}});
+var bBotMed = (c=P.RULE2) => ({bottom:{style:'medium',color:{rgb:c}}});
+var bBox    = (c=P.RULE)  => ({top:{style:'thin',color:{rgb:c}},bottom:{style:'thin',color:{rgb:c}},left:{style:'thin',color:{rgb:c}},right:{style:'thin',color:{rgb:c}}});
+var bLeft   = (c=P.RULE)  => ({left:{style:'thin',color:{rgb:c}}});
 
 // ── Number formats ────────────────────────────────────────────────────────────
-const FMT_MONEY  = '_("$"* #,##0.00_);_("$"* (#,##0.00);_("$"* "-"_);_(@_)';
-const FMT_MONEY0 = '_("$"* #,##0_);_("$"* (#,##0);_("$"* "-"_);_(@_)';
-const FMT_PCT    = '0.0%';
-const FMT_NUM    = '#,##0';
+var FMT_MONEY = '_("$"* #,##0.00_);_("$"* (#,##0.00);_("$"* "-"_);_(@_)';
+var FMT_MONEY0 = '_("$"* #,##0_);_("$"* (#,##0);_("$"* "-"_);_(@_)';
+var FMT_PCT = '0.0%';
+var FMT_NUM = '#,##0';
 
 // ── Style presets ─────────────────────────────────────────────────────────────
-const S = {
+var S: any = {
   // Page title — ink on white, large
   pageTitle: (): CS => ({
     font: F(true,16,P.INK), fill: Fill(P.WHITE),
