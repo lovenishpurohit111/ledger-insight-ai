@@ -4,12 +4,12 @@ import type { BalanceSheet } from './generateBalanceSheet';
 import type { CashFlowStatement } from './generateCashFlow';
 import type { ProfitAndLoss } from './generatePL';
 import type { MoMPL } from './generateMoMPL';
-import { monthLabel } from './generateMoMPL';
-// Inline helper to avoid any potential minification issues with named imports
-const _monthLabel = (key: string) => {
-  const [year, month] = key.split('-');
-  const d = new Date(Number(year), Number(month) - 1, 1);
-  return d.toLocaleString('en-US', { month: 'short', year: 'numeric' });
+// Inline monthLabel — no destructuring const to avoid minification TDZ
+const _monthLabel = (key: string): string => {
+  const parts = key.split('-');
+  const yr = Number(parts[0]);
+  const mo = Number(parts[1]) - 1;
+  return new Date(yr, mo, 1).toLocaleString('en-US', { month: 'short', year: 'numeric' });
 };
 import type { LedgerRow } from '../../app/upload/upload-utils';
 
