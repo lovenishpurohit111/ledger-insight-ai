@@ -4,31 +4,31 @@ import type { BalanceSheet } from './generateBalanceSheet';
 import type { CashFlowStatement } from './generateCashFlow';
 import type { ProfitAndLoss } from './generatePL';
 import type { MoMPL } from './generateMoMPL';
-// Inline monthLabel — no destructuring const to avoid minification TDZ
-const _monthLabel = (key: string): string => {
-  const parts = key.split('-');
-  const yr = Number(parts[0]);
-  const mo = Number(parts[1]) - 1;
-  return new Date(yr, mo, 1).toLocaleString('en-US', { month: 'short', year: 'numeric' });
-};
 import type { LedgerRow } from '../../app/upload/upload-utils';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type CS = any;
 
-// ── Formatters ────────────────────────────────────────────────────────────────
-const $f  = (n: number) => new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(n);
-const pf  = (n: number) => `${(n*100).toFixed(1)}%`;
-const base = (f: string) => f.replace(/\.[^.]+$/,'') || 'ledger';
+// Self-contained monthLabel — fully inlined, no imports
+function _monthLabel(key: string): string {
+  const pts = key.split('-');
+  return new Date(Number(pts[0]), Number(pts[1]) - 1, 1).toLocaleString('en-US', { month: 'short', year: 'numeric' });
+}
 
-const toNum = (s: string): number => {
+
+// ── Formatters ────────────────────────────────────────────────────────────────
+var $f  = (n: number) => new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(n);
+var pf  = (n: number) => `${(n*100).toFixed(1)}%`;
+var base = (f: string) => f.replace(/\.[^.]+$/,'') || 'ledger';
+
+var toNum = (s: string): number => {
   if (!s) return 0;
   const neg = s.trim().startsWith('(') || s.trim().startsWith('-');
   const n = parseFloat(s.replace(/[^0-9.]/g,''));
   return isNaN(n) ? 0 : neg ? -n : n;
 };
 
-const toIsoDate = (s: string): string => {
+var toIsoDate = (s: string): string => {
   if (!s.trim()) return s;
   if (/^\d{4}-\d{2}-\d{2}$/.test(s.trim())) return s.trim();
   const us = s.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
@@ -167,51 +167,51 @@ var S: any = {
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-const L  = (n: number) => n<26 ? String.fromCharCode(65+n) : String.fromCharCode(64+Math.floor(n/26))+String.fromCharCode(65+n%26);
-const MG = (r:number,c:number,r2:number,c2:number) => ({s:{r,c},e:{r:r2,c:c2}});
-const W  = (n: number) => ({wch:n});
-const H  = (pt: number) => ({hpt:pt});
+var L  = (n: number) => n<26 ? String.fromCharCode(65+n) : String.fromCharCode(64+Math.floor(n/26))+String.fromCharCode(65+n%26);
+var MG = (r:number,c:number,r2:number,c2:number) => ({s:{r,c},e:{r:r2,c:c2}});
+var W  = (n: number) => ({wch:n});
+var H  = (pt: number) => ({hpt:pt});
 
 // Write helpers
-const wv = (ws:CS,r:number,c:number,v:string|number,t:string,style:CS) => { ws[`${L(c)}${r}`]={v,t,s:style}; };
-const wf = (ws:CS,r:number,c:number,f:string,v:number,style:CS) => { ws[`${L(c)}${r}`]={t:'n',f,v,s:style}; };
-const fillRow = (ws:CS,r:number,from:number,to:number,bg:string) => {
+var wv = (ws:CS,r:number,c:number,v:string|number,t:string,style:CS) => { ws[`${L(c)}${r}`]={v,t,s:style}; };
+var wf = (ws:CS,r:number,c:number,f:string,v:number,style:CS) => { ws[`${L(c)}${r}`]={t:'n',f,v,s:style}; };
+var fillRow = (ws:CS,r:number,from:number,to:number,bg:string) => {
   for(let c=from;c<=to;c++){const a=`${L(c)}${r}`;ws[a]=ws[a]??{v:'',t:'s'};ws[a].s={fill:Fill(bg)};}
 };
-const emptyRow = (ws:CS,r:number,from:number,to:number) => {
+var emptyRow = (ws:CS,r:number,from:number,to:number) => {
   for(let c=from;c<=to;c++){const a=`${L(c)}${r}`;ws[a]=ws[a]??{v:'',t:'s',s:{fill:Fill(P.WHITE)}};}
 };
 
 // ASCII bar (visual substitute for chart — character-based data bar)
-const bar = (val: number, max: number, width=20): string => {
+var bar = (val: number, max: number, width=20): string => {
   if(max<=0) return '';
   const filled = Math.round((val/max)*width);
   return '█'.repeat(Math.max(0,filled)) + '░'.repeat(Math.max(0,width-filled));
 };
 
 // ── Formula builders ──────────────────────────────────────────────────────────
-const RL = 'Raw Ledger';
+var RL = 'Raw Ledger';
 let DEND = 5000;
 
-const TINC  = ['Income','income','Revenue','revenue','Sales','sales','Other Income','other income'];
-const TCOGS = ['Cost of Goods Sold','cost of goods sold','COGS','cogs','Cost of Sales'];
-const TEXP  = ['Expense','expense','Expenses','expenses','Other Expense','other expense'];
-const TAST  = ['Asset','asset','Bank','bank','Accounts Receivable (A/R)','Other Current Assets','Fixed Assets','Other Assets','Inventory'];
-const TLIA  = ['Liability','liability','Accounts Payable (A/P)','Credit Card','Other Current Liabilities','Long Term Liabilities','Other Liability'];
-const TEQ   = ['Equity','equity','Retained Earnings','Opening Balance Equity'];
+var TINC  = ['Income','income','Revenue','revenue','Sales','sales','Other Income','other income'];
+var TCOGS = ['Cost of Goods Sold','cost of goods sold','COGS','cogs','Cost of Sales'];
+var TEXP  = ['Expense','expense','Expenses','expenses','Other Expense','other expense'];
+var TAST  = ['Asset','asset','Bank','bank','Accounts Receivable (A/R)','Other Current Assets','Fixed Assets','Other Assets','Inventory'];
+var TLIA  = ['Liability','liability','Accounts Payable (A/P)','Credit Card','Other Current Liabilities','Long Term Liabilities','Other Liability'];
+var TEQ   = ['Equity','equity','Retained Earnings','Opening Balance Equity'];
 
-const SUMIF_chain = (types:string[],col:'I'|'J') =>
+var SUMIF_chain = (types:string[],col:'I'|'J') =>
   `IFERROR(${types.map(t=>`SUMIF('${RL}'!B$2:B$${DEND},"${t}",'${RL}'!${col}$2:${col}$${DEND})`).join('+')},0)`;
 
-const SUMPRODUCT_month = (types:string[],mk:string) => {
+var SUMPRODUCT_month = (types:string[],mk:string) => {
   const tf = types.map(t=>`('${RL}'!B$2:B$${DEND}="${t}")`).join('+');
   return `IFERROR(SUMPRODUCT(((${tf})>0)*(LEFT('${RL}'!C$2:C$${DEND},7)="${mk}")*ISNUMBER('${RL}'!I$2:I$${DEND})*('${RL}'!I$2:I$${DEND})),0)`;
 };
 
-const SUMPRODUCT_acct = (acct:string,mk:string) =>
+var SUMPRODUCT_acct = (acct:string,mk:string) =>
   `IFERROR(SUMPRODUCT(('${RL}'!A$2:A$${DEND}="${acct.replace(/"/g,'""')}")*(LEFT('${RL}'!C$2:C$${DEND},7)="${mk}")*ISNUMBER('${RL}'!I$2:I$${DEND})*('${RL}'!I$2:I$${DEND})),0)`;
 
-const LOOKUP_bal = (acct:string) =>
+var LOOKUP_bal = (acct:string) =>
   `IFERROR(LOOKUP(2,1/('${RL}'!A$2:A$${DEND}="${acct.replace(/"/g,'""')}"),'${RL}'!J$2:J$${DEND}),0)`;
 
 // ═════════════════════════════════════════════════════════════════════════════
