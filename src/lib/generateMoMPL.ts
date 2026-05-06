@@ -43,7 +43,7 @@ const extractMonthKey = (value: string): string | null => {
   return null;
 };
 
-export const monthLabel = (key: string) => {
+export function monthLabel(key: string): string {
   const [year, month] = key.split('-');
   const d = new Date(Number(year), Number(month) - 1, 1);
   return d.toLocaleString('en-US', { month: 'short', year: 'numeric' });
@@ -122,7 +122,7 @@ export function generateMoMPL(rows: LedgerRow[]): MoMPL {
   };
 }
 
-export const momChange = (current: number, previous: number): number | null => {
+export function momChange(current: number, previous: number): number | null {
   if (previous === 0) return null;
   return roundCurrency(((current - previous) / Math.abs(previous)) * 100);
-};
+}

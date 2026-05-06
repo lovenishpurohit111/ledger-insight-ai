@@ -1,6 +1,6 @@
 export type BalanceSheetCategory = 'asset' | 'liability' | 'equity';
 
-export const parseCurrencyAmount = (value: string): number | null => {
+export function parseCurrencyAmount(value: string): number | null {
   const s = value.trim();
   if (!s) return null;
   const isNeg = (s.startsWith('(') && s.endsWith(')')) || s.startsWith('-');
@@ -31,7 +31,7 @@ const match = (set: Set<string>, kws: string[], v: string) => {
   return set.has(t) || kws.some(k => t.includes(k));
 };
 
-export const classifyBalanceSheetType = (v: string): BalanceSheetCategory | null => {
+export function classifyBalanceSheetType(v: string): BalanceSheetCategory | null {
   const t = v.trim().toLowerCase();
   if (ASSET_TYPES.has(t) || ['receivable','prepaid'].some(k => t.includes(k))) return 'asset';
   if (LIABILITY_TYPES.has(t) || ['liabilit','payable','credit card','loan','mortgage'].some(k => t.includes(k))) return 'liability';
@@ -39,10 +39,14 @@ export const classifyBalanceSheetType = (v: string): BalanceSheetCategory | null
   return null;
 };
 
-export const isCurrentAsset     = (v: string) => { const t = v.trim().toLowerCase(); return CURRENT_ASSET_TYPES.has(t) || ['bank','receivable','prepaid','cash','inventory'].some(k => t.includes(k)); };
-export const isNonCurrentAsset  = (v: string) => { const t = v.trim().toLowerCase(); return NONCURRENT_ASSET_TYPES.has(t) || ['fixed','equipment','furniture','vehicle','building','land'].some(k => t.includes(k)); };
-export const isCurrentLiability = (v: string) => { const t = v.trim().toLowerCase(); return CURRENT_LIABILITY_TYPES.has(t) || ['payable','credit card'].some(k => t.includes(k)); };
-export const isNonCurrentLiability = (v: string) => { const t = v.trim().toLowerCase(); return NONCURRENT_LIABILITY_TYPES.has(t) || ['long term','long-term','mortgage','note payable'].some(k => t.includes(k)); };
+export function isCurrentAsset(v: string) {
+  const t = v.trim().toLowerCase(); return CURRENT_ASSET_TYPES.has(t) || ['bank','receivable','prepaid','cash','inventory'].some(k => t.includes(k)); };
+export function isNonCurrentAsset(v: string) {
+  const t = v.trim().toLowerCase(); return NONCURRENT_ASSET_TYPES.has(t) || ['fixed','equipment','furniture','vehicle','building','land'].some(k => t.includes(k)); };
+export function isCurrentLiability(v: string) {
+  const t = v.trim().toLowerCase(); return CURRENT_LIABILITY_TYPES.has(t) || ['payable','credit card'].some(k => t.includes(k)); };
+export function isNonCurrentLiability(v: string) {
+  const t = v.trim().toLowerCase(); return NONCURRENT_LIABILITY_TYPES.has(t) || ['long term','long-term','mortgage','note payable'].some(k => t.includes(k)); };
 
 export const isRevenueType = (v: string) => match(INCOME_TYPES, ['income','revenue','sales'], v);
 export const isCogsType    = (v: string) => match(COGS_TYPES,   ['cost of goods','cogs','cost of sales'], v);

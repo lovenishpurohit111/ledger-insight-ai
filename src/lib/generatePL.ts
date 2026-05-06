@@ -17,7 +17,7 @@ export type ProfitAndLoss = {
 
 const pad = (v: number) => String(v).padStart(2, '0');
 
-export const extractMonthKey = (value: string): string | null => {
+export function extractMonthKey(value: string): string | null {
   const s = value.trim();
   if (!s) return null;
   const iso = s.match(/^(\d{4})[-/](\d{1,2})[-/]\d{1,2}$/);
