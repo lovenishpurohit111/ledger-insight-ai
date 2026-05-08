@@ -773,7 +773,10 @@ export function exportExcel(
   XLSX.writeFile(wb,`${base(fileName)}_Financial_Analysis.xlsx`);
   } catch(err) {
     console.error('Excel export error:', err);
-    alert(`Excel export failed: ${err instanceof Error ? err.message : String(err)}`);
+    const stack = err instanceof Error ? (err.stack || '') : '';
+    // Find the line number from stack
+    const line = stack.split('\n').slice(0,5).join('\n');
+    alert(`Excel export failed: ${err instanceof Error ? err.message : String(err)}\n\n${line}`);
   }
 }
 
