@@ -602,29 +602,29 @@ export function exportExcel(
   // ══ 5. MONTH-OVER-MONTH ═══════════════════════════════════════════════════
   if(mom&&mom.months.length>0){
     const ws:CS={};
-    const months=mom.months; const nC=months.length+2;
+    const momMonths=mom.months; const nC=momMonths.length+2;
 
     emptyRow(ws,1,0,nC-1);
     wv(ws,2,0,'Month-over-Month P&L','s',{font:F(true,16,P.INK),fill:Fill(P.WHITE),alignment:AL('left','center')});
-    wv(ws,3,0,`${co}  ·  ${_monthLabel(months[0])} → ${_monthLabel(months[months.length-1])}  ·  ${months.length} months`,'s',{font:F(false,9,P.MUTED,true),fill:Fill(P.WHITE),alignment:AL('left','center')});
+    wv(ws,3,0,`${co}  ·  ${_monthLabel(momMonths[0])} → ${_monthLabel(momMonths[momMonths.length-1])}  ·  ${momMonths.length} months`,'s',{font:F(false,9,P.MUTED,true),fill:Fill(P.WHITE),alignment:AL('left','center')});
     for(let c=0;c<=nC-1;c++) ws[`${L(c)}4`]={v:'',t:'s',s:{fill:Fill(P.INK)}};
     emptyRow(ws,5,0,nC-1);
 
     // Headers row 6
     ws['A6']={v:'Account',t:'s',s:S.colHdrL()};
-    months.forEach((m,i)=>ws[`${L(i+1)}6`]={v:_monthLabel(m),t:'s',s:S.colHdr()});
-    ws[`${L(months.length+1)}6`]={v:'Total',t:'s',s:{...S.colHdr(),fill:Fill(P.SLATE)}};
+    momMonths.forEach((mk,i)=>ws[`${L(i+1)}6`]={v:_monthLabel(mk),t:'s',s:S.colHdr()});
+    ws[`${L(momMonths.length+1)}6`]={v:'Total',t:'s',s:{...S.colHdr(),fill:Fill(P.SLATE)}};
 
     // MoM % row 7
     ws['A7']={v:'MoM Revenue Δ%',t:'s',s:{font:F(true,8,P.MUTED),fill:Fill(P.OFFWHT),alignment:AL('left','center'),border:bBotMed()}};
-    months.forEach((_,i)=>{
+    momMonths.forEach((_mk,i)=>{
       if(i===0){ws[`B7`]={v:'Baseline',t:'s',s:{font:F(false,8,P.MUTED),fill:Fill(P.OFFWHT),alignment:AL('center','center'),border:bBotMed()}};return;}
-      const cur=mom.monthlyRevenue[months[i]]??0; const prv=mom.monthlyRevenue[months[i-1]]??0;
+      const cur=mom.monthlyRevenue[momMonths[i]]??0; const prv=mom.monthlyRevenue[momMonths[i-1]]??0;
       const pct=prv!==0?(cur-prv)/Math.abs(prv):0;
       const revTotRow=8+mom.incomeCategories.length+1;
       ws[`${L(i+1)}7`]={t:'n',f:`IF(${L(i)}${revTotRow}=0,0,(${L(i+1)}${revTotRow}-${L(i)}${revTotRow})/ABS(${L(i)}${revTotRow}))`,v:pct,s:{font:F(true,9,cur>=prv?P.GRN:P.RED),fill:Fill(cur>=prv?P.GRN_LT:P.RED_LT),numFmt:'+0.0%;[Red]-0.0%;"—"',alignment:AL('right','center'),border:bBotMed()}};
     });
-    ws[`${L(months.length+1)}7`]={v:'',t:'s',s:{fill:Fill(P.OFFWHT),border:bBotMed()}};
+    ws[`${L(momMonths.length+1)}7`]={v:'',t:'s',s:{fill:Fill(P.OFFWHT),border:bBotMed()}};
 
     let r=8;
 
@@ -635,14 +635,14 @@ export function exportExcel(
     mom.incomeCategories.forEach((cat,ri)=>{
       const rb=ri%2===0?P.WHITE:P.OFFWHT;
       wv(ws,r,0,`  ${cat.name}`,'s',S.row(rb));
-      months.forEach((m,i)=>{const v=cat.months[m]??0;wf(ws,r,i+1,SUMPRODUCT_acct(cat.name,m),v,{...S.rowR(rb,v>0?P.TEXT:P.MUTED),numFmt:FMT_MONEY});});
-      wf(ws,r,months.length+1,`SUM(${L(1)}${r}:${L(months.length)}${r})`,cat.total,{...S.rowR(rb),numFmt:FMT_MONEY,font:F(true,10,P.TEXT)});
+      momMonths.forEach((mk,i)=>{const v=cat.months[mk]??0;wf(ws,r,i+1,SUMPRODUCT_acct(cat.name,mk),v,{...S.rowR(rb,v>0?P.TEXT:P.MUTED),numFmt:FMT_MONEY});});
+      wf(ws,r,momMonths.length+1,`SUM(${L(1)}${r}:${L(momMonths.length)}${r})`,cat.total,{...S.rowR(rb),numFmt:FMT_MONEY,font:F(true,10,P.TEXT)});
       r++;
     });
     const revTR=r;
     ws[`A${r}`]={v:'Total Revenue',t:'s',s:S.totalL(P.GRN_LT,P.GRN)};
-    months.forEach((_,i)=>wf(ws,r,i+1,`SUM(${L(i+1)}${incS}:${L(i+1)}${r-1})`,mom.monthlyRevenue[months[i]]??0,{...S.total(P.GRN_LT,P.GRN)}));
-    wf(ws,r,months.length+1,`SUM(${L(1)}${r}:${L(months.length)}${r})`,mom.totalRevenue,S.total(P.GRN_LT,P.GRN));
+    momMonths.forEach((_,i)=>wf(ws,r,i+1,`SUM(${L(i+1)}${incS}:${L(i+1)}${r-1})`,mom.monthlyRevenue[momMonths[i]]??0,{...S.total(P.GRN_LT,P.GRN)}));
+    wf(ws,r,momMonths.length+1,`SUM(${L(1)}${r}:${L(momMonths.length)}${r})`,mom.totalRevenue,S.total(P.GRN_LT,P.GRN));
     r+=2;
 
     // Expenses
@@ -652,26 +652,26 @@ export function exportExcel(
     mom.expenseCategories.forEach((cat,ri)=>{
       const rb=ri%2===0?P.WHITE:P.OFFWHT;
       wv(ws,r,0,`  ${cat.name}`,'s',S.row(rb));
-      months.forEach((m,i)=>{const v=cat.months[m]??0;wf(ws,r,i+1,SUMPRODUCT_acct(cat.name,m),v,{...S.rowR(rb,v>0?P.TEXT:P.MUTED),numFmt:FMT_MONEY});});
-      wf(ws,r,months.length+1,`SUM(${L(1)}${r}:${L(months.length)}${r})`,cat.total,{...S.rowR(rb),numFmt:FMT_MONEY,font:F(true,10,P.TEXT)});
+      momMonths.forEach((mk,i)=>{const v=cat.months[mk]??0;wf(ws,r,i+1,SUMPRODUCT_acct(cat.name,mk),v,{...S.rowR(rb,v>0?P.TEXT:P.MUTED),numFmt:FMT_MONEY});});
+      wf(ws,r,momMonths.length+1,`SUM(${L(1)}${r}:${L(momMonths.length)}${r})`,cat.total,{...S.rowR(rb),numFmt:FMT_MONEY,font:F(true,10,P.TEXT)});
       r++;
     });
     const expTR=r;
     ws[`A${r}`]={v:'Total Expenses',t:'s',s:S.totalL(P.RED_LT,P.RED)};
-    months.forEach((_,i)=>wf(ws,r,i+1,`SUM(${L(i+1)}${expS}:${L(i+1)}${r-1})`,mom.monthlyExpenses[months[i]]??0,S.total(P.RED_LT,P.RED)));
-    wf(ws,r,months.length+1,`SUM(${L(1)}${r}:${L(months.length)}${r})`,mom.totalExpenses,S.total(P.RED_LT,P.RED));
+    momMonths.forEach((_,i)=>wf(ws,r,i+1,`SUM(${L(i+1)}${expS}:${L(i+1)}${r-1})`,mom.monthlyExpenses[momMonths[i]]??0,S.total(P.RED_LT,P.RED)));
+    wf(ws,r,momMonths.length+1,`SUM(${L(1)}${r}:${L(momMonths.length)}${r})`,mom.totalExpenses,S.total(P.RED_LT,P.RED));
     r+=2;
 
     const npC2=mom.totalNetProfit>=0?P.GRN:P.RED; const npBg=mom.totalNetProfit>=0?P.GRN_LT:P.RED_LT;
     ws[`A${r}`]={v:'NET PROFIT',t:'s',s:S.totalL(npBg,npC2)};
-    months.forEach((_,i)=>{
-      const v=mom.monthlyNetProfit[months[i]]??0; const vc=v>=0?P.GRN:P.RED; const vbg=v>=0?P.GRN_LT:P.RED_LT;
+    momMonths.forEach((_mk,i)=>{
+      const v=mom.monthlyNetProfit[momMonths[i]]??0; const vc=v>=0?P.GRN:P.RED; const vbg=v>=0?P.GRN_LT:P.RED_LT;
       wf(ws,r,i+1,`${L(i+1)}${revTR}-${L(i+1)}${expTR}`,v,{...S.total(vbg,vc)});
     });
-    wf(ws,r,months.length+1,`${L(months.length+1)}${revTR}-${L(months.length+1)}${expTR}`,mom.totalNetProfit,S.total(npBg,npC2));
+    wf(ws,r,momMonths.length+1,`${L(momMonths.length+1)}${revTR}-${L(momMonths.length+1)}${expTR}`,mom.totalNetProfit,S.total(npBg,npC2));
 
     ws['!ref']=`A1:${L(nC-1)}${r}`;
-    ws['!cols']=[W(28),...months.map(()=>W(12)),W(14)];
+    ws['!cols']=[W(28),...momMonths.map(()=>W(12)),W(14)];
     ws['!rows']=[H(6),H(28),H(16),H(4),H(6)];
     ws['!merges']=[MG(1,0,1,nC-1),MG(2,0,2,nC-1),MG(3,0,3,nC-1),MG(4,0,4,nC-1)];
     ws['!freeze']={xSplit:1,ySplit:6};
