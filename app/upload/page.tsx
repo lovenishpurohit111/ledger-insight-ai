@@ -7,7 +7,7 @@ import { generateCashFlow, type CashFlowStatement } from '../../src/lib/generate
 import { generatePL, type ProfitAndLoss } from '../../src/lib/generatePL';
 import { generateMoMPL, monthLabel, momChange, type MoMPL } from '../../src/lib/generateMoMPL';
 import { generateInsights, type FinancialInsights } from '../../src/lib/generateInsights';
-import { exportCsv, exportExcel, exportPdf } from '../../src/lib/exportUtils';
+// exportUtils loaded dynamically to prevent SSR/minification TDZ issues
 import { FileDropzone, type UploadTheme } from './components/FileDropzone';
 import { PreviewTable } from './components/PreviewTable';
 import { ValidationPanel } from './components/ValidationPanel';
@@ -344,11 +344,11 @@ export default function UploadPage() {
             <ThemeToggle />
             {analysis && profitAndLoss && balanceSheet && cashFlow && (
               <>
-                <button type="button" onClick={() => exportCsv(fileName, analysis, profitAndLoss, balanceSheet, cashFlow)}
+                <button type="button" onClick={async () => { const m = await import('../../src/lib/exportUtils'); m.exportCsv(fileName, analysis, profitAndLoss, balanceSheet, cashFlow); }}
                   className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white shadow transition-colors hover:bg-emerald-700">↓ CSV</button>
-                <button type="button" onClick={() => exportExcel(fileName, analysis, profitAndLoss, balanceSheet, cashFlow, momPL ?? undefined, allRows)}
+                <button type="button" onClick={async () => { const m = await import('../../src/lib/exportUtils'); m.exportExcel(fileName, analysis, profitAndLoss, balanceSheet, cashFlow, momPL ?? undefined, allRows); }}
                   className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white shadow transition-colors hover:bg-blue-700">↓ Excel</button>
-                <button type="button" onClick={() => exportPdf(fileName, analysis, profitAndLoss, balanceSheet, cashFlow)}
+                <button type="button" onClick={async () => { const m = await import('../../src/lib/exportUtils'); m.exportPdf(fileName, analysis, profitAndLoss, balanceSheet, cashFlow); }}
                   className="rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white shadow transition-colors hover:bg-rose-700">↓ PDF</button>
               </>
             )}
